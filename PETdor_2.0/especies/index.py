@@ -7,7 +7,7 @@ as configurações de cada espécie.
 """
 
 from dataclasses import dataclass
-from typing import List, Dict, Optional # <-- CORREÇÃO: Adicionado 'Optional' aqui!
+from typing import List, Dict, Optional
 
 @dataclass
 class Pergunta:
@@ -39,6 +39,10 @@ def listar_especies() -> List[EspecieConfig]:
 def buscar_especie_por_id(especie_id: str) -> Optional[EspecieConfig]:
     """Busca uma configuração de espécie pelo seu ID."""
     return _ESPECIES_REGISTRADAS.get(especie_id)
+
+def get_especies_nomes() -> List[str]: # <-- NOVA FUNÇÃO ADICIONADA AQUI!
+    """Retorna uma lista com os nomes de todas as espécies registradas."""
+    return [config.nome for config in _ESPECIES_REGISTRADAS.values()]
 
 # ----------------------------------------------------------------------
 # Importa e registra as configurações de cada espécie

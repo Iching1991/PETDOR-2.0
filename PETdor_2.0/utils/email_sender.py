@@ -4,18 +4,16 @@
 Envio de e-mails do PETDor:
 - confirmação de cadastro
 - recuperação de senha
-
 As credenciais SMTP vêm de variáveis de ambiente (.env).
 """
-
 import os
 import smtplib
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Optional # Importação adicionada para 'Optional'
+from typing import Optional
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv # <-- CORREÇÃO: Removido o texto extra aqui!
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +26,11 @@ SMTP_USERNAME = os.getenv("SMTP_USERNAME")      # ex: no-reply@petdor.app
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", SMTP_USERNAME or "no-reply@petdor.app")
 
-
 def _enviar_email(
     destinatario: str,
     assunto: str,
     corpo_html: str,
-    corpo_texto: Optional[str] = None, # Usando Optional[str]
+    corpo_texto: Optional[str] = None,
 ) -> bool:
     """
     Função interna genérica para enviar e-mail via SMTP.
@@ -50,9 +47,7 @@ def _enviar_email(
     msg["Subject"] = assunto
 
     if corpo_texto is None:
-        # Fallback simples: remove tags HTML grosseiramente
         import re
-
         corpo_texto = re.sub("<[^<]+?>", "", corpo_html)
 
     msg.attach(MIMEText(corpo_texto, "plain", "utf-8"))
@@ -73,7 +68,6 @@ def _enviar_email(
         )
         return False
 
-
 # -------------------------------------------------
 # Confirmação de e-mail de cadastro
 # -------------------------------------------------
@@ -87,10 +81,7 @@ def enviar_email_confirmacao(
     Usado por auth.user.cadastrar_usuario.
     """
     assunto = "Confirme seu cadastro no PETDor"
-
-    # Em produção, troque localhost pelo domínio oficial (ex: https://app.petdor.app)
     link = f"http://localhost:8501/?pagina=confirmar_email&token={token}"
-
     corpo_html = f"""
     <html>
       <body>
@@ -103,24 +94,16 @@ def enviar_email_confirmacao(
       </body>
     </html>
     """
-
     corpo_texto = f"""
 Olá, {nome_usuario},
-
 Obrigado por se cadastrar no PETDor!
-
 Para ativar sua conta, acesse o link abaixo:
-
 {link}
-
 Se você não fez este cadastro, pode ignorar esta mensagem.
-
 Abraços,
 Equipe PETDor
 """.strip()
-
     return _enviar_email(destinatario, assunto, corpo_html, corpo_texto)
-
 
 # -------------------------------------------------
 # Recuperação de senha
@@ -135,9 +118,7 @@ def enviar_email_recuperacao_senha(
     Usado por auth.password_reset.reset_password_request.
     """
     assunto = "Recuperação de senha - PETDor"
-
     link = f"http://localhost:8501/?pagina=reset_senha&token={token}"
-
     corpo_html = f"""
     <html>
       <body>
@@ -150,20 +131,13 @@ def enviar_email_recuperacao_senha(
       </body>
     </html>
     """
-
     corpo_texto = f"""
 Olá, {nome_usuario},
-
 Recebemos uma solicitação para redefinir a senha da sua conta PETDor.
-
 Para redefinir sua senha, acesse o link abaixo:
-
 {link}
-
 Se você não fez esta solicitação, pode ignorar esta mensagem.
-
 Abraços,
 Equipe PETDor
 """.strip()
-
     return _enviar_email(destinatario, assunto, corpo_html, corpo_texto)

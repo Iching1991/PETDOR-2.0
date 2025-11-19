@@ -4,11 +4,11 @@
 🐕 Configuração de avaliação para CÃES.
 Escala: 0 a 7 (baseada em CBPI e Glasgow Composite Pain Scale).
 """
-from .base import EspecieConfig, Pergunta
+from .index import EspecieConfig, Pergunta # Importa de especies.index agora!
 
 CONFIG_CAES = EspecieConfig(
     nome="Cachorro",
-    especie_id="cao", # Adicionei o especie_id para consistência
+    especie_id="cao",
     descricao="Avaliação de dor em cães - Escala de 0 (nunca) a 7 (sempre).",
     opcoes_escala=[
         "0 - Nunca",
@@ -44,3 +44,4 @@ CONFIG_CAES = EspecieConfig(
         Pergunta(texto="Meu cão dormiu bem durante a", invertida=True, peso=1.0),
     ],
 )
+

@@ -1,113 +1,146 @@
+"""
+Envio de e-mails do PETDor:
+- confirmação de cadastro
+- recuperação de senha
+
+As credenciais SMTP vêm de variáveis de ambiente (.env).
+"""
+
+import os
 import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-import streamlit as st
 import logging
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
+# Carrega variáveis do .env na raiz do projeto
+load_dotenv()
 
-# ===============================
-# Função interna de envio SMTP
-# ===============================
-def _enviar_email(destinatario, assunto, html):
+SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.office365.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME")      # ex: no-reply@petdor.app
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", SMTP_USERNAME or "no-reply@petdor.app")
+
+
+def _enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: str | None = None) -> bool:
+    """
+    Função interna genérica para enviar e-mail via SMTP.
+    """
+    if not (SMTP_USERNAME and SMTP_PASSWORD):
+        logger.error("Credenciais SMTP não configuradas (SMTP_USERNAME / SMTP_PASSWORD).")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["From"] = SENDER_EMAIL
+    msg["To"] = destinatario
+    msg["Subject"] = assunto
+
+    if corpo_texto is None:
+        # Fallback simples: remove tags HTML grosseiramente
+        import re
+        corpo_texto = re.sub("<[^<]+?>", "", corpo_html)
+
+    msg.attach(MIMEText(corpo_texto, "plain", "utf-8"))
+    msg.attach(MIMEText(corpo_html, "html", "utf-8"))
+
     try:
-        smtp_server = st.secrets["EMAIL"]["SMTP_SERVER"]
-        smtp_port = st.secrets["EMAIL"]["SMTP_PORT"]
-        smtp_user = st.secrets["EMAIL"]["SMTP_USER"]    # relatorio@petdor.app
-        smtp_pass = st.secrets["EMAIL"]["SMTP_PASS"]
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = assunto
-        msg["From"] = smtp_user
-        msg["To"] = destinatario
-
-        msg.attach(MIMEText(html, "html", "utf-8"))
-
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.sendmail(smtp_user, destinatario, msg.as_string())
-        server.quit()
-
-        logger.info(f"[EMAIL] Enviado com sucesso para {destinatario}")
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.sendmail(SENDER_EMAIL, destinatario, msg.as_string())
+        logger.info("E-mail enviado para %s com assunto '%s'", destinatario, assunto)
         return True
-
     except Exception as e:
-        logger.error(f"[ERRO EMAIL] Falha ao enviar e-mail: {e}")
+        logger.error("Falha ao enviar e-mail para %s: %s", destinatario, e, exc_info=True)
         return False
 
 
-# ===============================
-# Template HTML padrão
-# ===============================
-def _template_base(titulo, corpo_html):
-    return f"""
-    <div style="background:#f7f7f7;padding:25px;font-family:Arial;">
-        <div style="max-width:600px;margin:auto;background:#ffffff;padding:25px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.1);">
-            <h2 style="color:#1a73e8;text-align:center;margin-bottom:20px;">{titulo}</h2>
+# -------------------------------------------------
+# Confirmação de e-mail de cadastro
+# -------------------------------------------------
+def enviar_email_confirmacao(destinatario: str, nome_usuario: str, token: str) -> bool:
+    """
+    Envia e-mail de confirmação de cadastro.
+    Usado por auth.user.cadastrar_usuario.
+    """
+    assunto = "Confirme seu cadastro no PETDor"
 
-            <div style="font-size:15px;color:#333;line-height:1.6;">
-                {corpo_html}
-            </div>
+    # Em produção, troque localhost pelo domínio oficial (ex: https://app.petdor.app)
+    link = f"http://localhost:8501/?pagina=confirmar_email&token={token}"
 
-            <br><hr style="border:none;border-top:1px solid #ddd;">
-            <p style="font-size:12px;text-align:center;color:#888;margin-top:10px;">
-                PETDor • Sistema de Avaliação de Dor Animal<br>
-                Este e-mail foi enviado automaticamente. Não responda.
-            </p>
-        </div>
-    </div>
+    corpo_html = f"""
+    <html>
+      <body>
+        <p>Olá, {nome_usuario},</p>
+        <p>Obrigado por se cadastrar no PETDor!</p>
+        <p>Para ativar sua conta, clique no link abaixo:</p>
+        <p><a href="{link}">Confirmar meu e-mail</a></p>
+        <p>Se você não fez este cadastro, pode ignorar esta mensagem.</p>
+        <p>Abraços,<br>Equipe PETDor</p>
+      </body>
+    </html>
     """
 
+    corpo_texto = f"""
+Olá, {nome_usuario},
 
-# ===============================
-# CONFIRMAÇÃO DE CADASTRO
-# ===============================
-def enviar_email_confirmacao(email, nome, token):
-    link = f"https://petdor.streamlit.app/confirmar_email?token={token}"
+Obrigado por se cadastrar no PETDor!
 
-    corpo = f"""
-        <p>Olá <b>{nome}</b>,</p>
-        <p>Obrigado por se cadastrar no <b>PETDor</b>! Para ativar sua conta, clique no botão abaixo:</p>
+Para ativar sua conta, acesse o link abaixo:
 
-        <p style="text-align:center;margin-top:30px;">
-            <a href="{link}" 
-               style="background:#1a73e8;color:white;padding:15px 25px;
-                      text-decoration:none;border-radius:8px;font-size:16px;">
-                Confirmar Cadastro
-            </a>
-        </p>
+{link}
 
-        <p style="margin-top:25px;">Ou copie e cole o link no navegador:</p>
-        <p>{link}</p>
+Se você não fez este cadastro, pode ignorar esta mensagem.
+
+Abraços,
+Equipe PETDor
+""".strip()
+
+    return _enviar_email(destinatario, assunto, corpo_html, corpo_texto)
+
+
+# -------------------------------------------------
+# Recuperação de senha
+# -------------------------------------------------
+def enviar_email_recuperacao_senha(destinatario: str, nome_usuario: str, token: str) -> bool:
+    """
+    Envia e-mail com link de recuperação de senha.
+    Usado por auth.password_reset.reset_password_request.
+    """
+    assunto = "Recuperação de senha - PETDor"
+
+    link = f"http://localhost:8501/?pagina=reset_senha&token={token}"
+
+    corpo_html = f"""
+    <html>
+      <body>
+        <p>Olá, {nome_usuario},</p>
+        <p>Recebemos uma solicitação para redefinir a senha da sua conta PETDor.</p>
+        <p>Para redefinir sua senha, clique no link abaixo:</p>
+        <p><a href="{link}">Redefinir minha senha</a></p>
+        <p>Se você não fez esta solicitação, pode ignorar este e-mail.</p>
+        <p>Abraços,<br>Equipe PETDor</p>
+      </body>
+    </html>
     """
 
-    html = _template_base("Confirmação de Cadastro", corpo)
-    return _enviar_email(email, "Confirme seu cadastro - PETDor", html)
+    corpo_texto = f"""
+Olá, {nome_usuario},
 
+Recebemos uma solicitação para redefinir a senha da sua conta PETDor.
 
-# ===============================
-# E-MAIL DE RESET DE SENHA
-# ===============================
-def enviar_email_reset(email, token):
-    link = f"https://petdor.streamlit.app/reset_senha?token={token}"
+Para redefinir sua senha, acesse o link abaixo:
 
-    corpo = f"""
-        <p>Você solicitou a redefinição da sua senha no <b>PETDor</b>.</p>
-        <p>Clique no botão abaixo para redefinir:</p>
+{link}
 
-        <p style="text-align:center;margin-top:30px;">
-            <a href="{link}"
-               style="background:#e37400;color:white;padding:15px 25px;
-                      text-decoration:none;border-radius:8px;font-size:16px;">
-                Redefinir Senha
-            </a>
-        </p>
+Se você não fez esta solicitação, pode ignorar este e-mail.
 
-        <p style="margin-top:25px;">Ou copie e cole o link no navegador:</p>
-        <p>{link}</p>
-    """
+Abraços,
+Equipe PETDor
+""".strip()
 
-    html = _template_base("Redefinição de Senha", corpo)
-    return _enviar_email(email, "Redefinir senha - PETDor", html)
+    return _enviar_email(destinatario, assunto, corpo_html, corpo_texto)

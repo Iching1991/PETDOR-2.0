@@ -8,7 +8,7 @@ from auth.user import (
 )
 from pages.cadastro_pet import app as cadastro_pet_app
 from pages.avaliacao import app as avaliacao_app
-from auth.password_reset import reset_password_request, reset_password
+from auth.password_reset import reset_password_request, redefinir_senha
 
 # 🔧 Inicializa banco
 migrar_banco_completo()
@@ -78,3 +78,4 @@ elif menu == "Redefinir Senha":
             st.success("Senha alterada com sucesso!")
         else:
             st.error("Token inválido ou expirado.")
+

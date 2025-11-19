@@ -1,4 +1,3 @@
-# PetDor/petdor.py
 import streamlit as st
 from database.migration import migrar_banco_completo
 from auth.user import (
@@ -8,7 +7,8 @@ from auth.user import (
 )
 from pages.cadastro_pet import app as cadastro_pet_app
 from pages.avaliacao import app as avaliacao_app
-from auth.password_reset import reset_password_request, redefinir_senha
+# Importações corrigidas para corresponder aos nomes das funções em auth/password_reset.py
+from auth.password_reset import solicitar_reset_senha, validar_token_reset, redefinir_senha
 
 # 🔧 Inicializa banco
 migrar_banco_completo()
@@ -24,23 +24,23 @@ menu = st.sidebar.selectbox("Menu", ["Login", "Criar Conta", "Redefinir Senha"])
 # LOGIN
 # -------------------------------
 if menu == "Login":
-    email = st.text_input("E-mail")
-    senha = st.text_input("Senha", type="password")
-    if st.button("Entrar"):
+    st.subheader("Login")
+    email = st.text_input("E-mail", key="login_email")
+    senha = st.text_input("Senha", type="password", key="login_senha")
+    if st.button("Entrar", key="btn_login"):
         ok, msg, user_id = autenticar_usuario(email, senha)
         if ok:
             st.success(msg)
             st.session_state.user_id = user_id
+            st.session_state.page = "avaliacao" # Redireciona para a página de avaliação
         else:
             st.error(msg)
 
-    if "user_id" in st.session_state:
+    if "user_id" in st.session_state and st.session_state.page == "avaliacao":
         user_id = st.session_state.user_id
         st.subheader("Cadastro e Avaliações")
-
         # Cadastro de Pets
         cadastro_pet_app(user_id)
-
         # Avaliações
         avaliacao_app(user_id)
 
@@ -48,11 +48,12 @@ if menu == "Login":
 # CRIAR CONTA
 # -------------------------------
 elif menu == "Criar Conta":
-    nome = st.text_input("Nome")
-    email = st.text_input("E-mail")
-    senha = st.text_input("Senha", type="password")
-    confirmar = st.text_input("Confirmar senha", type="password")
-    if st.button("Criar"):
+    st.subheader("Criar Nova Conta")
+    nome = st.text_input("Nome", key="criar_nome")
+    email = st.text_input("E-mail", key="criar_email")
+    senha = st.text_input("Senha", type="password", key="criar_senha")
+    confirmar = st.text_input("Confirmar senha", type="password", key="criar_confirmar")
+    if st.button("Criar", key="btn_criar_conta"):
         ok, msg = cadastrar_usuario(nome, email, senha, confirmar)
         if ok:
             st.success(msg)
@@ -63,19 +64,34 @@ elif menu == "Criar Conta":
 # REDEFINIR SENHA
 # -------------------------------
 elif menu == "Redefinir Senha":
-    email = st.text_input("Seu e-mail")
-    if st.button("Enviar token"):
-        token = reset_password_request(email)
-        if token:
-            st.info(f"Token gerado: {token}\n\nCopie e cole abaixo.")
+    st.subheader("Redefinir Senha")
+    email_reset = st.text_input("Seu e-mail", key="reset_email")
+    if st.button("Enviar link de redefinição", key="btn_enviar_token"):
+        # A função solicitar_reset_senha envia o e-mail e retorna True/False
+        ok = solicitar_reset_senha(email_reset)
+        if ok:
+            st.info("Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha.")
         else:
-            st.error("E-mail não encontrado.")
+            st.error("Ocorreu um erro ao tentar enviar o e-mail. Tente novamente mais tarde.")
 
-    token = st.text_input("Token")
-    nova = st.text_input("Nova senha", type="password")
-    if st.button("Alterar senha"):
-        if reset_password(token, nova):
-            st.success("Senha alterada com sucesso!")
+    st.markdown("---") # Separador visual
+    st.write("Ou, se você já tem um token:")
+    token_input = st.text_input("Token de redefinição", key="reset_token")
+    nova_senha = st.text_input("Nova senha", type="password", key="reset_nova_senha")
+
+    if st.button("Alterar senha", key="btn_alterar_senha"):
+        if not token_input or not nova_senha:
+            st.error("Preencha o token e a nova senha.")
         else:
-            st.error("Token inválido ou expirado.")
+            # 1. Validar o token e obter o ID do usuário
+            token_valido_status, usuario_id = validar_token_reset(token_input)
 
+            if token_valido_status and usuario_id:
+                # 2. Redefinir a senha
+                ok_redefinir = redefinir_senha(usuario_id, nova_senha, token_input)
+                if ok_redefinir:
+                    st.success("Senha alterada com sucesso! Você já pode fazer login.")
+                else:
+                    st.error("Erro ao redefinir a senha. Tente novamente.")
+            else:
+                st.error("Token inválido ou expirado.")

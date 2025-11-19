@@ -1,6 +1,5 @@
 import sqlite3
-from database.connection import conectar_db
-
+from .connection import conectar_db
 
 # ==========================================================
 # Função principal para criar todas as tabelas
@@ -28,7 +27,7 @@ def criar_tabelas():
     # -------------------------------
     # Tokens de confirmação de e-mail
     # -------------------------------
-    cursor.execute("""
+ cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_confirmacoes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             usuario_id INTEGER NOT NULL,
@@ -91,6 +90,22 @@ def criar_tabelas():
     print("✔ Banco atualizado: Todas as tabelas foram criadas com sucesso.")
 
 
+# ==========================================================
+# Migração completa (ponto único de entrada para migrações)
+# ==========================================================
+def migrar_banco_completo():
+    """
+    Executa todas as migrações necessárias para deixar o banco atualizado.
+
+    No momento:
+    - Cria as tabelas, se não existirem (criar_tabelas).
+
+    Futuras migrações (ex: novas colunas, flags de desativação, etc.)
+    podem ser adicionadas aqui em sequência.
+    """
+    criar_tabelas()
+    print("✔ Migração completa executada (criação/atualização de tabelas).")
+
 
 # ==========================================================
 # Utilitário opcional para resetar o banco (apenas dev)
@@ -108,5 +123,3 @@ def resetar_banco():
     conn.commit()
     conn.close()
     print("⚠ Banco de dados resetado (modo DEV).")
-
-

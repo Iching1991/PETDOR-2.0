@@ -4,7 +4,7 @@
 🐈 Configuração de avaliação de dor para GATOS.
 Escala: 0 a 7 (baseada em escalas de dor felina).
 """
-from .base import EspecieConfig, Pergunta
+from .index import EspecieConfig, Pergunta # Importa de especies.index agora!
 
 CONFIG_GATOS = EspecieConfig(
     nome="Gato",

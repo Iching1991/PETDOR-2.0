@@ -1,3 +1,5 @@
+# PETdor_2.0/especies/coelho.py
+
 """
 🐇 Configuração de avaliação para COELHOS
 Escala: 0 a 7 — baseada no Rabbit Grimace Scale e parâmetros comportamentais.
@@ -6,6 +8,7 @@ from especies.index import EspecieConfig, Pergunta
 
 CONFIG_COELHO = EspecieConfig(
     nome="Coelho",
+    especie_id="coelho", # <-- CORREÇÃO: Adicionado o campo especie_id aqui!
     descricao="Avaliação de dor em coelhos — Escala de 0 (nunca) a 7 (sempre).",
     opcoes_escala=[
         "0 - Nunca", "1 - Raramente", "2 - Às vezes", "3 - Frequentemente",
@@ -31,3 +34,5 @@ CONFIG_COELHO = EspecieConfig(
         Pergunta(texto="Meu coelho reage com dor quando tocado", invertida=False, peso=1.0),
     ]
 )
+
+

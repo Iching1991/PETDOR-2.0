@@ -3,7 +3,7 @@
 import logging
 from database.connection import conectar_db
 from utils.tokens import validar_token_simples
-from utils.email_sender import enviar_email_confirmacao # Importação corrigida
+from utils.email_sender import enviar_email_confirmacao # <--- ESTA LINHA FOI CORRIGIDA!
 
 logger = logging.getLogger(__name__)
 
@@ -86,3 +86,4 @@ def reenviar_email_confirmacao(email: str) -> bool:
     except Exception as e:
         logger.error(f"Erro ao reenviar e-mail de confirmação para {email}: {e}", exc_info=True)
         return False
+

@@ -13,7 +13,7 @@ import streamlit as st
 # Inicialização e imports locais (projeto organizado)
 try:
     from database.migration import criar_tabelas, migrar_banco_completo
-    from database.connection import conectar_db, init_database
+    from database.connection import conectar_db
     from auth.user import cadastrar_usuario, autenticar_usuario, buscar_usuario_por_id
     from database.models import buscar_usuario_por_email, buscar_pet_por_id  # optional
     from especies import get_especies_nomes, get_especie_config

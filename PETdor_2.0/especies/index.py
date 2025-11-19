@@ -7,7 +7,7 @@ as configurações de cada espécie.
 """
 
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import List, Dict, Optional # <-- CORREÇÃO: Adicionado 'Optional' aqui!
 
 @dataclass
 class Pergunta:
@@ -44,12 +44,12 @@ def buscar_especie_por_id(especie_id: str) -> Optional[EspecieConfig]:
 # Importa e registra as configurações de cada espécie
 # ----------------------------------------------------------------------
 # Importa as configurações de cada arquivo de espécie
-from .cao import CONFIG_CAES         # <-- Importa CONFIG_CAES
-from .gato import CONFIG_GATOS       # <-- Importa CONFIG_GATOS (plural)
-from .coelho import CONFIG_COELHO    # <-- Importa CONFIG_COELHO
-from .porquinho import CONFIG_PORQUINHO # <-- Importa CONFIG_PORQUINHO
-from .aves import CONFIG_AVES        # <-- Importa CONFIG_AVES
-from .repteis import CONFIG_REPTEIS  # <-- Importa CONFIG_REPTEIS
+from .cao import CONFIG_CAES
+from .gato import CONFIG_GATOS
+from .coelho import CONFIG_COELHO
+from .porquinho import CONFIG_PORQUINHO
+from .aves import CONFIG_AVES
+from .repteis import CONFIG_REPTEIS
 
 # Registra as configurações importadas
 registrar_especie(CONFIG_CAES)

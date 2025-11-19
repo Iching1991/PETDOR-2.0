@@ -1,5 +1,5 @@
 import sqlite3
-from .connection import conectar_db
+from .connection import conectar_db # Importação relativa, mais robusta dentro do pacote
 
 # ==========================================================
 # Função principal para criar todas as tabelas
@@ -27,7 +27,7 @@ def criar_tabelas():
     # -------------------------------
     # Tokens de confirmação de e-mail
     # -------------------------------
- cursor.execute("""
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_confirmacoes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             usuario_id INTEGER NOT NULL,

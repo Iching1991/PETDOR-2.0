@@ -4,7 +4,7 @@ Sistema de recuperação de senha do PETDor
 import logging
 from database.connection import conectar_db
 from utils.tokens import gerar_token_simples, validar_token_simples
-from utils.email_sender import enviar_email
+from utils.email_sender import enviar_email_recuperacao_senha
 from auth.security import gerar_hash_senha
 
 logger = logging.getLogger(__name__)
@@ -115,3 +115,4 @@ def redefinir_senha(usuario_id, nova_senha, token):
     except Exception as e:
         logger.error(f"Erro ao redefinir senha: {e}")
         return False
+

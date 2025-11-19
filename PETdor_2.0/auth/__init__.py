@@ -6,22 +6,21 @@ Expõe funcionalidades de autenticação e gerenciamento de usuários.
 """
 
 # Importa os submódulos para que possam ser acessados via auth.user, auth.password_reset, etc.
+# NUNCA importe funções específicas aqui se elas podem causar um ciclo.
+# Apenas importe os módulos.
 from . import user
 from . import password_reset
-from . import email_confirmation # Você tem email_confirmation.py na sua estrutura
-from . import security # Você tem security.py na sua estrutura
+from . import email_confirmation # Conforme sua estrutura de pastas
+from . import security           # Conforme sua estrutura de pastas
 
 __all__ = [
     "user",
     "password_reset",
-    "email_confirmation", # Adicionado para expor o módulo
-    "security",           # Adicionado para expor o módulo
+    "email_confirmation",
+    "security",
 ]
 
-# Se você *realmente* precisar expor funções específicas diretamente do pacote 'auth'
-# (ex: auth.cadastrar_usuario), você pode fazer isso AQUI, mas com cuidado para não criar ciclos.
-# Por exemplo, se auth.user não depende de auth.__init__ para carregar, você pode fazer:
-# from .user import cadastrar_usuario, autenticar_usuario, buscar_usuario_por_id
-# __all__.extend(["cadastrar_usuario", "autenticar_usuario", "buscar_usuario_por_id"])
-# Mas para evitar o ciclo atual, é melhor que o petdor.py importe diretamente de auth.user
-# ou auth.password_reset.
+# Se você precisar que funções como 'cadastrar_usuario' sejam acessíveis diretamente
+# como 'auth.cadastrar_usuario', você pode adicioná-las aqui DEPOIS que os módulos
+# já foram importados e carregados. Mas, para resolver o ciclo atual, é mais seguro
+# que o petdor.py importe diretamente de 'auth.user' (o que ele já faz).

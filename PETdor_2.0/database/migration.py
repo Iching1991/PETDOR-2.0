@@ -15,16 +15,21 @@ def criar_tabelas():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
-            senha_hash TEXT NOT NULL,              -- <--- CORRIGIDO: de 'senha' para 'senha_hash'
+            senha_hash TEXT NOT NULL,
             tipo_usuario TEXT NOT NULL,              -- tutor, veterinario, clinica
             pais TEXT,
             email_confirmado INTEGER DEFAULT 0,
+            email_confirm_token TEXT,                -- <--- ADICIONADO: Coluna para o token de confirmação
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            ativo INTEGER DEFAULT 1                  -- Adicionado: flag para desativar usuário
+            ativo INTEGER DEFAULT 1
         );
     """)
     # -------------------------------
-    # Tokens de confirmação de e-mail
+    # Tokens de confirmação de e-mail (Esta tabela pode ser removida se o token for direto no usuário)
+    # No seu código atual, o token está sendo salvo na tabela 'usuarios', então esta tabela 'email_confirmacoes'
+    # não está sendo usada para o token em si, mas pode ser para logs ou histórico.
+    # Se você não for usar esta tabela, pode removê-la para simplificar.
+    # Por enquanto, vamos mantê-la como está, mas o token principal vai para 'usuarios'.
     # -------------------------------
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_confirmacoes (
@@ -95,7 +100,7 @@ def migrar_banco_completo():
     Futuras migrações (ex: novas colunas, flags de desativação, etc.)
     podem ser adicionadas aqui em sequência.
     """
-    resetar_banco() # <--- ADICIONADO: Reseta o banco para garantir a nova estrutura
+    resetar_banco() # Reseta o banco para garantir a nova estrutura
     criar_tabelas()
     print("✔ Migração completa executada (criação/atualização de tabelas).")
 

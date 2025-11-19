@@ -4,20 +4,15 @@
 Módulo de inicialização do pacote 'auth'.
 Expõe funcionalidades de autenticação e gerenciamento de usuários.
 """
-
 # Importa os submódulos para que possam ser acessados via auth.user, auth.password_reset, etc.
 # NUNCA importe funções específicas aqui se elas podem causar um ciclo.
 # Apenas importe os módulos.
 from . import user
 from . import password_reset
-from . import email_confirmation # Conforme sua estrutura de pastas
-from . import security           # Conforme sua estrutura de pastas
 
 __all__ = [
     "user",
     "password_reset",
-    "email_confirmation",
-    "security",
 ]
 
 # Se você precisar que funções como 'cadastrar_usuario' sejam acessíveis diretamente

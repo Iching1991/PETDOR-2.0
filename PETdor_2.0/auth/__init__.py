@@ -1,21 +1,19 @@
 # PETdor_2.0/auth/__init__.py
+"""
+Módulo de autenticação e gerenciamento de usuários para o PETDor.
+Contém funcionalidades para cadastro, login, redefinição de senha e segurança.
+"""
 
-"""
-Módulo de inicialização do pacote 'auth'.
-Expõe funcionalidades de autenticação e gerenciamento de usuários.
-"""
-# Importa os submódulos para que possam ser acessados via auth.user, auth.password_reset.
-# NUNCA importe funções específicas aqui se elas podem causar um ciclo.
-# Apenas importe os módulos.
+# Importa os módulos principais para serem acessíveis diretamente via 'auth.user', 'auth.security', etc.
 from . import user
 from . import password_reset
+from . import email_confirmation
+from . import security
 
+# Define quais módulos são expostos quando 'from auth import *' é usado
 __all__ = [
     "user",
     "password_reset",
+    "email_confirmation",
+    "security",
 ]
-
-# Se você precisar que funções como 'cadastrar_usuario' sejam acessíveis diretamente
-# como 'auth.cadastrar_usuario', você pode adicioná-las aqui DEPOIS que os módulos
-# já foram importados e carregados. Mas, para resolver o ciclo atual, é mais seguro
-# que o petdor.py importe diretamente de 'auth.user' (o que ele já faz).

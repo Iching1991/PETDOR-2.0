@@ -4,13 +4,11 @@ Módulo de autenticação e gerenciamento de usuários para o PETDor.
 Contém funcionalidades para cadastro, login, redefinição de senha e segurança.
 """
 
-# Importa os módulos principais para serem acessíveis diretamente via 'auth.user', 'auth.security', etc.
-from . import user
-from . import password_reset
-from . import email_confirmation
-from . import security
+# Não importamos os módulos aqui para evitar ciclos.
+# Eles serão importados diretamente onde forem necessários (ex: em petdor.py).
 
-# Define quais módulos são expostos quando 'from auth import *' é usado
+# Definimos __all__ para indicar o que faz parte do pacote,
+# mas sem carregar os módulos imediatamente.
 __all__ = [
     "user",
     "password_reset",

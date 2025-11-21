@@ -1,73 +1,60 @@
 # PETdor_2_0/database/connection.py
 """
-Conexão inteligente: PostgreSQL (Supabase com pg8000) na nuvem ou SQLite local.
+Módulo de conexão com o banco de dados.
+Atualmente configurado para usar SQLite localmente.
 """
 import os
 import sqlite3
 import logging
-from collections import namedtuple
+# A classe 'namedtuple' não é mais necessária com sqlite3.Row
 
 logger = logging.getLogger(__name__)
 
-# --- Cursor para retornar resultados como dicionários (compatível com SQLite) ---
-# Para SQLite, sqlite3.Row já faz isso, mas mantemos a consistência
-class DictCursor:
-    """Cursor que retorna linhas como dicionários."""
-    def __init__(self, cursor):
-        self._cursor = cursor
-
-    @property
-    def description(self):
-        return [d[0] for d in self._cursor.description]
-
-    def fetchone(self):
-        row = self._cursor.fetchone()
-        if row is None:
-            return None
-        return dict(zip(self.description, row))
-
-    def fetchall(self):
-        rows = self._cursor.fetchall()
-        if not rows:
-            return []
-        return [dict(zip(self.description, row)) for row in rows]
-
-    def __getattr__(self, name):
-        return getattr(self._cursor, name)
-
-# ------------- SQLite (desenvolvimento local e fallback para produção) -------------
+# --- SQLite (desenvolvimento local e fallback para produção) ---
 def conectar_db_sqlite():
-    """Conecta ao SQLite local (petdor.db)."""
+    """
+    Conecta ao banco de dados SQLite local (petdor.db).
+    Cria o diretório 'data' se não existir.
+    Configura o row_factory para retornar linhas como objetos que se comportam como dicionários.
+    """
     db_dir = "data"
-    os.makedirs(db_dir, exist_ok=True)
+    os.makedirs(db_dir, exist_ok=True) # Garante que o diretório 'data' existe
     db_path = os.path.join(db_dir, "petdor.db")
+
+    # check_same_thread=False é importante para Streamlit, pois pode acessar o DB de threads diferentes
     conn = sqlite3.connect(db_path, check_same_thread=False)
-    conn.row_factory = sqlite3.Row # sqlite3.Row já retorna como dicionário/namedtuple
+    conn.row_factory = sqlite3.Row # Retorna linhas como objetos que se comportam como dicionários
     logger.info(f"Conectado ao SQLite: {db_path}")
     return conn
 
-# ------------- Função principal: escolhe o banco certo (agora só SQLite) -------------
+# --- Função principal de conexão ---
 def conectar_db():
     """
-    Conecta ao banco de dados SQLite local.
-    Temporariamente desativando a conexão Supabase para resolver problemas de deploy.
+    Função principal para conectar ao banco de dados.
+    Atualmente força o uso de SQLite local.
     """
     logger.info("Forçando uso de SQLite local para deploy.")
     return conectar_db_sqlite()
 
-# ------------- Função de teste de conexão (apenas para SQLite agora) -------------
+# --- Função de teste de conexão (apenas para SQLite) ---
 def testar_conexao_sqlite():
-    """Testa se consegue conectar no SQLite e listar tabelas."""
+    """
+    Testa se consegue conectar no SQLite e listar as tabelas existentes.
+    Retorna True e uma mensagem de sucesso com as tabelas, ou False e a mensagem de erro.
+    """
+    conn = None # Inicializa conn como None para garantir que seja fechado no finally
     try:
         conn = conectar_db_sqlite()
         cur = conn.cursor()
         cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tabelas = [row[0] for row in cur.fetchall()]
-        conn.close()
 
-        logger.info(f"Conexão SQLite OK. Tabelas: {tabelas}")
+        logger.info(f"Conexão SQLite OK. Tabelas encontradas: {tabelas}")
         return True, f"Conexão OK. Tabelas encontradas: {tabelas}"
 
     except Exception as e:
-        logger.error(f"Falha na conexão SQLite: {e}")
-        return False, str(e)
+        logger.error(f"Falha na conexão SQLite: {e}", exc_info=True) # Adicionado exc_info=True para logar o traceback completo
+        return False, f"Falha na conexão SQLite: {e}"
+    finally:
+        if conn:
+            conn.close() # Garante que a conexão seja fechada

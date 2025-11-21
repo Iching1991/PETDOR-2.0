@@ -5,7 +5,7 @@ from datetime import datetime
 import os # Importado para usar os.getenv na criar_tabelas_se_nao_existir
 from database.connection import conectar_db # Importa a função inteligente
 from .security import hash_password, generate_email_token, verify_email_token, verify_password # Adicionado verify_password
-from ..email_sender import enviar_email_confirmacao # Importação relativa e nome da função corrigido
+from utils.email_sender import enviar_email_confirmacao # Importação ABSOLUTA corrigida
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -237,3 +237,4 @@ def atualizar_tipo_usuario(user_id, tipo_usuario):
     finally:
         if conn:
             conn.close()
+

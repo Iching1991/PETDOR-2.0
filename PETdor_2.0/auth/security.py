@@ -38,11 +38,11 @@ def verify_password(senha: str, hashed_password: str) -> bool: # NOME CORRETO
         return False
 
 # -------------------------------
-# GERAR TOKEN DE CONFIRMAÇÃO DE E-MAIL
+# GERAR TOKEN DE CONFIRMAÇÃO DE E-MAIL / RESET DE SENHA
 # -------------------------------
-def generate_email_token() -> str: # NOME CORRETO
+def generate_email_token() -> str: # NOME CORRETO (usado para ambos os tipos de token)
     """
-    Gera um token único para confirmação de e-mail usando UUID.
+    Gera um token único para confirmação de e-mail ou reset de senha usando UUID.
     """
     return str(uuid.uuid4())
 

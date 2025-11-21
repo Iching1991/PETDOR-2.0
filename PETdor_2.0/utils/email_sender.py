@@ -1,8 +1,9 @@
 # PETdor_2_0/utils/email_sender.py
 """
-Módulo para envio de e-mails do sistema PETDOR.
-Suporta confirmação de conta e reset de senha.
+Módulo de envio de e-mails do PETDOR.
+Suporta confirmação de conta e redefinição de senha.
 """
+
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -11,189 +12,178 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Configurações de e-mail (de variáveis de ambiente)
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.godaddy.com")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+# -----------------------------
+# CONFIGURAÇÕES DE E-MAIL
+# -----------------------------
+
+# GoDaddy SMTP correto (caso o usuário não defina por variável de ambiente)
+DEFAULT_GODADDY_SMTP = "smtpout.secureserver.net"
+
+EMAIL_HOST = os.getenv("EMAIL_HOST", DEFAULT_GODADDY_SMTP)
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))  # TLS padrão
 EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", "relatorio@petdor.app")
 
+# -----------------------------
+# Função interna genérica
+# -----------------------------
 def _enviar_email_generico(destinatario: str, assunto: str, corpo_html: str) -> bool:
     """
-    Função interna para enviar e-mails usando SMTP.
-    Retorna True se enviado com sucesso, False caso contrário.
+    Envia um e-mail HTML via SMTP.
+    Retorna True se enviado com sucesso.
     """
-    # Verifica se as configurações estão completas
-    if not all([EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD]):
-        logger.error("Configurações de e-mail incompletas. Verifique EMAIL_USER, EMAIL_PASSWORD e EMAIL_HOST.")
+
+    # Verificação básica de configuração
+    if not EMAIL_USER or not EMAIL_PASSWORD:
+        logger.error("❌ EMAIL_USER ou EMAIL_PASSWORD não configurados.")
         return False
 
-    # Cria a mensagem
+    if not EMAIL_HOST:
+        logger.error("❌ EMAIL_HOST não configurado.")
+        return False
+
+    if not EMAIL_SENDER:
+        logger.error("❌ EMAIL_SENDER vazio. Configure EMAIL_SENDER nas variáveis.")
+        return False
+
+    # Monta mensagem
     msg = MIMEMultipart("alternative")
     msg["Subject"] = assunto
     msg["From"] = EMAIL_SENDER
     msg["To"] = destinatario
 
-    # Adiciona o corpo HTML
+    # Corpo HTML
     msg.attach(MIMEText(corpo_html, "html"))
 
     try:
-        # Conecta ao servidor SMTP
         with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
-            server.starttls()  # Inicia TLS
+            server.starttls()             # Godaddy exige STARTTLS
             server.login(EMAIL_USER, EMAIL_PASSWORD)
             server.sendmail(EMAIL_SENDER, destinatario, msg.as_string())
 
-        logger.info(f"E-mail enviado com sucesso para {destinatario} (Assunto: {assunto})")
+        logger.info(f"📧 E-mail enviado para {destinatario} - Assunto: {assunto}")
         return True
 
     except smtplib.SMTPAuthenticationError as e:
-        logger.error(f"Falha de autenticação SMTP para {destinatario}: {e}")
-        logger.error("Verifique EMAIL_USER e EMAIL_PASSWORD nas variáveis de ambiente")
+        logger.error(f"❌ Falha de autenticação SMTP: {e}")
+        return False
+
+    except smtplib.SMTPConnectError as e:
+        logger.error(f"❌ Erro de conexão SMTP: {e}")
         return False
 
     except smtplib.SMTPRecipientsRefused as e:
-        logger.error(f"Destinatário recusado para {destinatario}: {e}")
+        logger.error(f"❌ Destinatário recusado: {destinatario} | Erro: {e}")
         return False
 
     except Exception as e:
-        logger.error(f"Erro ao enviar e-mail para {destinatario}: {e}", exc_info=True)
+        logger.error(f"❌ Erro geral ao enviar e-mail: {e}", exc_info=True)
         return False
 
+
+# -----------------------------
+# CONFIRMAÇÃO DE CONTA
+# -----------------------------
 def enviar_email_confirmacao(destinatario: str, nome_usuario: str, token: str) -> bool:
     """
-    Envia e-mail de confirmação de conta para novo usuário.
-
-    Args:
-        destinatario: E-mail do usuário
-        nome_usuario: Nome do usuário
-        token: Token de confirmação
-
-    Returns:
-        bool: True se enviado com sucesso
+    Envia e-mail de confirmação de conta.
     """
     assunto = "🎾 Confirme sua conta no PETDOR"
-
-    # URL de confirmação (ajuste para seu domínio)
     confirm_url = f"https://petdor.streamlit.app/confirmar_email?token={token}"
 
     corpo_html = f"""
     <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background-color: #4CAF50; color: white; padding: 20px; text-align: center; }}
-                .button {{ background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; }}
-                .footer {{ text-align: center; margin-top: 30px; font-size: 12px; color: #666; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🎾 Confirmação de Conta PETDOR</h1>
-                </div>
-                <p>Olá, <strong>{nome_usuario}</strong>,</p>
-                <p>Obrigado por se cadastrar no <strong>PETDOR</strong>! Por favor, clique no botão abaixo para confirmar seu e-mail:</p>
-                <p style="text-align: center; margin: 30px 0;">
-                    <a href="{confirm_url}" class="button">Confirmar E-mail</a>
-                </p>
-                <p><em>Ou copie e cole este link no seu navegador:</em><br>
-                <a href="{confirm_url}">{confirm_url}</a></p>
-                <p>Se você não solicitou este cadastro, por favor, ignore este e-mail.</p>
-                <hr>
-                <div class="footer">
-                    <p>Atenciosamente,<br>
-                    <strong>Equipe PETDOR</strong><br>
-                    <a href="https://petdor.streamlit.app">petdor.streamlit.app</a></p>
-                </div>
-            </div>
+        <body style="font-family: Arial; color:#333;">
+            <h2 style="background:#4CAF50; color:white; padding:15px; text-align:center;">
+                Confirmação de Conta PETDOR
+            </h2>
+
+            <p>Olá, <strong>{nome_usuario}</strong>,</p>
+            <p>Obrigado por se cadastrar no <strong>PETDOR</strong>! Clique abaixo para confirmar seu e-mail:</p>
+
+            <p style="text-align:center;">
+                <a href="{confirm_url}" 
+                   style="background:#4CAF50; color:white; padding:12px 25px; border-radius:6px; text-decoration:none;">
+                   Confirmar E-mail
+                </a>
+            </p>
+
+            <p>Ou copie o link:<br>{confirm_url}</p>
+
+            <hr>
+            <p style="text-align:center; color:#666; font-size:12px;">
+                Equipe PETDOR — <a href="https://petdor.streamlit.app">petdor.streamlit.app</a>
+            </p>
         </body>
     </html>
     """
 
     return _enviar_email_generico(destinatario, assunto, corpo_html)
 
-# CORRIGIDO: Renomeado de enviar_email_recuperacao_senha para enviar_email_reset_senha
+
+# -----------------------------
+# RESET DE SENHA
+# -----------------------------
 def enviar_email_reset_senha(destinatario: str, nome_usuario: str, token: str) -> bool:
     """
-    Envia e-mail com link para redefinir senha.
-
-    Args:
-        destinatario: E-mail do usuário
-        nome_usuario: Nome do usuário
-        token: Token de reset de senha
-
-    Returns:
-        bool: True se enviado com sucesso
+    Envia e-mail para redefinição de senha.
     """
     assunto = "🔑 Redefinição de Senha - PETDOR"
-
-    # URL de reset de senha (ajuste para seu domínio)
     reset_url = f"https://petdor.streamlit.app/redefinir_senha?token={token}"
 
     corpo_html = f"""
     <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background-color: #ff9800; color: white; padding: 20px; text-align: center; }}
-                .button {{ background-color: #ff9800; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; }}
-                .warning {{ background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }}
-                .footer {{ text-align: center; margin-top: 30px; font-size: 12px; color: #666; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🔑 Redefinir Senha PETDOR</h1>
-                </div>
-                <p>Olá, <strong>{nome_usuario}</strong>,</p>
-                <p>Recebemos uma solicitação para redefinir a senha da sua conta no <strong>PETDOR</strong>.</p>
-                <p>Se você solicitou esta redefinição, clique no botão abaixo para criar uma nova senha:</p>
-                <p style="text-align: center; margin: 30px 0;">
-                    <a href="{reset_url}" class="button">Redefinir Senha</a>
-                </p>
-                <p><em>Ou copie e cole este link no seu navegador:</em><br>
-                <a href="{reset_url}">{reset_url}</a></p>
+        <body style="font-family: Arial; color:#333;">
+            <h2 style="background:#ff9800; color:white; padding:15px; text-align:center;">
+                Redefinir Senha PETDOR
+            </h2>
 
-                <div class="warning">
-                    <strong>⚠️ Importante:</strong> Este link é válido por apenas <strong>1 hora</strong>. 
-                    Se você não solicitou a redefinição de senha, por favor, ignore este e-mail.
-                </div>
+            <p>Olá, <strong>{nome_usuario}</strong>,</p>
+            <p>Você solicitou redefinir sua senha. Clique abaixo:</p>
 
-                <hr>
-                <div class="footer">
-                    <p>Atenciosamente,<br>
-                    <strong>Equipe PETDOR</strong><br>
-                    <a href="https://petdor.streamlit.app">petdor.streamlit.app</a></p>
-                </div>
-            </div>
+            <p style="text-align:center;">
+                <a href="{reset_url}"
+                   style="background:#ff9800; color:white; padding:12px 25px; border-radius:6px; text-decoration:none;">
+                   Redefinir Senha
+                </a>
+            </p>
+
+            <p>Ou copie o link:<br>{reset_url}</p>
+
+            <p style="background:#fff3cd; border:1px solid #ffeaa7; padding:10px; border-radius:5px;">
+                ⚠️ Este link expira em <strong>1 hora</strong>.
+            </p>
+
+            <hr>
+            <p style="text-align:center; color:#666; font-size:12px;">
+                Equipe PETDOR — <a href="https://petdor.streamlit.app">petdor.streamlit.app</a>
+            </p>
         </body>
     </html>
     """
 
     return _enviar_email_generico(destinatario, assunto, corpo_html)
 
-# Função adicional para testes (opcional)
+
+# -----------------------------
+# TESTE DE CONFIGURAÇÃO SMTP
+# -----------------------------
 def testar_configuracao_email() -> dict:
     """
-    Testa se a configuração de e-mail está funcionando.
-    Útil para debug.
-
-    Returns:
-        dict: Status das configurações e teste de conexão
+    Testa a conexão com o servidor de e-mail.
+    Útil para debug via Streamlit.
     """
     status = {
-        "configuracoes_completas": all([EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD]),
-        "email_host": EMAIL_HOST,
-        "email_port": EMAIL_PORT,
-        "email_sender": EMAIL_SENDER,
+        "EMAIL_HOST": EMAIL_HOST,
+        "EMAIL_PORT": EMAIL_PORT,
+        "EMAIL_USER": EMAIL_USER,
+        "EMAIL_SENDER": EMAIL_SENDER,
+        "configuracoes_ok": all([EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD]),
         "conexao_smtp": False
     }
 
-    if status["configuracoes_completas"]:
+    if status["configuracoes_ok"]:
         try:
             with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
                 server.starttls()

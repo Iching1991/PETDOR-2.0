@@ -131,4 +131,3 @@ def testar_conexao_supabase():
     except Exception as e:
         logger.error(f"Falha na conexão Supabase com pg8000: {e}")
         return False, str(e)
-

@@ -2,6 +2,4 @@ streamlit==1.32.0
 bcrypt==4.1.2
 python-dotenv==1.0.1
 altair==5.2.0
-pandas==2.1.4  # Versão ligeiramente mais antiga e estável
-numpy==1.26.4  # Versão ligeiramente mais antiga e estável
 Pillow==10.3.0

@@ -1,167 +1,94 @@
-# PETdor_2.0/utils/email_sender.py
-
-"""
-Envio de e-mails do PETDor:
-- confirmação de cadastro
-- recuperação de senha
-As credenciais SMTP vêm de variáveis de ambiente (.env).
-"""
-import os
+# PETdor_2_0/utils/email_sender.py
 import smtplib
-import logging
-import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Optional
-
-from dotenv import load_dotenv
+import os
+import logging
 
 logger = logging.getLogger(__name__)
 
-# Carrega variáveis do .env na raiz do projeto
-load_dotenv()
+# Configurações de e-mail (idealmente de variáveis de ambiente)
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587)) # Default para TLS
+EMAIL_USER = os.getenv("EMAIL_USER")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+EMAIL_SENDER = os.getenv("EMAIL_SENDER", "relatorio@petdor.app") # Usando o e-mail central
 
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.office365.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SMTP_USERNAME = os.getenv("SMTP_USERNAME")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", SMTP_USERNAME or "no-reply@petdor.app")
-
-# ----------------------------------------------------------------------
-# URL base do app em produção - URL CORRETA DO SEU APP
-# ----------------------------------------------------------------------
-APP_BASE_URL = os.getenv(
-    "APP_BASE_URL",
-    "https://petdor.streamlit.app"  # URL do seu app no Streamlit Cloud
-)
-# ----------------------------------------------------------------------
-
-def _enviar_email(
-    destinatario: str,
-    assunto: str,
-    corpo_html: str,
-    corpo_texto: Optional[str] = None,
-) -> bool:
-    """
-    Função interna genérica para enviar e-mail via SMTP.
-    """
-    if not (SMTP_USERNAME and SMTP_PASSWORD):
-        logger.error(
-            "Credenciais SMTP não configuradas (SMTP_USERNAME / SMTP_PASSWORD)."
-        )
+def _enviar_email_generico(destinatario: str, assunto: str, corpo_html: str):
+    """Função interna para enviar e-mails."""
+    if not all([EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD]):
+        logger.error("Configurações de e-mail incompletas. Não é possível enviar e-mail.")
         return False
 
     msg = MIMEMultipart("alternative")
-    msg["From"] = SENDER_EMAIL
-    msg["To"] = destinatario
     msg["Subject"] = assunto
+    msg["From"] = EMAIL_SENDER
+    msg["To"] = destinatario
 
-    if corpo_texto is None:
-        # Fallback simples: remove tags HTML grosseiramente
-        corpo_texto = re.sub("<[^<]+?>", "", corpo_html)
-
-    msg.attach(MIMEText(corpo_texto, "plain", "utf-8"))
-    msg.attach(MIMEText(corpo_html, "html", "utf-8"))
+    # Adiciona a versão HTML do corpo
+    msg.attach(MIMEText(corpo_html, "html"))
 
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SENDER_EMAIL, destinatario, msg.as_string())
-        logger.info(
-            "E-mail enviado para %s com assunto '%s'", destinatario, assunto
-        )
+        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
+            server.starttls() # Inicia a criptografia TLS
+            server.login(EMAIL_USER, EMAIL_PASSWORD)
+            server.sendmail(EMAIL_SENDER, destinatario, msg.as_string())
+        logger.info(f"E-mail enviado com sucesso para {destinatario} (Assunto: {assunto})")
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(f"Falha de autenticação SMTP ao enviar e-mail para {destinatario}: {e}")
+        # Lembrete da memória: "continua enfrentando falha de autenticação SMTP (erro 535 Authentication unsuccessful)"
+        # Isso indica que as credenciais EMAIL_USER/EMAIL_PASSWORD podem estar incorretas ou o app não tem permissão.
+        # Verifique as variáveis de ambiente no Streamlit Cloud e as configurações do seu provedor (GoDaddy).
+        return False
     except Exception as e:
-        logger.error(
-            "Falha ao enviar e-mail para %s: %s", destinatario, e, exc_info=True
-        )
+        logger.error(f"Erro ao enviar e-mail para {destinatario}: {e}", exc_info=True)
         return False
 
-# -------------------------------------------------
-# Confirmação de e-mail de cadastro
-# -------------------------------------------------
-def enviar_email_confirmacao(
-    destinatario: str,
-    nome_usuario: str,
-    token: str,
-) -> bool:
-    """
-    Envia e-mail de confirmação de cadastro.
-    Usado por auth.user.cadastrar_usuario.
-    """
-    assunto = "Confirme seu cadastro no PETDor"
-    # LINK CORRIGIDO: Agora aponta para https://petdor.streamlit.app
-    link = f"{APP_BASE_URL}/?pagina=confirmar_email&token={token}"
+def enviar_email_confirmacao(destinatario: str, nome_usuario: str, token: str):
+    """Envia um e-mail de confirmação de conta."""
+    assunto = "Confirme sua conta PETDor"
+    # URL de confirmação (ajuste para o seu domínio real no Streamlit Cloud)
+    # Exemplo: https://petdor.streamlit.app/confirmar_email?token={token}
+    # Ou se você já tem o domínio petdor.app redirecionado: https://petdor.app/confirmar_email?token={token}
+    confirm_url = f"https://petdor.streamlit.app/confirmar_email?token={token}" 
+
     corpo_html = f"""
     <html>
-      <body>
-        <p>Olá, {nome_usuario},</p>
-        <p>Obrigado por se cadastrar no PETDor!</p>
-        <p>Para ativar sua conta, clique no link abaixo:</p>
-        <p><a href="{link}">🔗 Confirmar meu e-mail</a></p>
-        <p><small>Se o botão não funcionar, copie e cole este link no seu navegador:</small></p>
-        <p><code>{link}</code></p>
-        <p>Se você não fez este cadastro, pode ignorar esta mensagem.</p>
-        <p>Abraços,<br>Equipe PETDor</p>
-      </body>
+        <body>
+            <p>Olá, {nome_usuario},</p>
+            <p>Obrigado por se cadastrar no PETDor! Por favor, clique no link abaixo para confirmar seu e-mail:</p>
+            <p><a href="{confirm_url}">Confirmar E-mail</a></p>
+            <p>Se você não solicitou este cadastro, por favor, ignore este e-mail.</p>
+            <p>Atenciosamente,</p>
+            <p>Equipe PETDor</p>
+        </body>
     </html>
     """
-    corpo_texto = f"""
-Olá, {nome_usuario},
+    return _enviar_email_generico(destinatario, assunto, corpo_html)
 
-Obrigado por se cadastrar no PETDor!
+# --- NOVA FUNÇÃO PARA RESET DE SENHA ---
+def enviar_email_reset_senha(destinatario: str, nome_usuario: str, token: str):
+    """Envia um e-mail com o link para redefinir a senha."""
+    assunto = "Redefinição de Senha PETDor"
+    # URL de reset de senha (ajuste para o seu domínio real no Streamlit Cloud)
+    # Exemplo: https://petdor.streamlit.app/redefinir_senha?token={token}
+    # Ou se você já tem o domínio petdor.app redirecionado: https://petdor.app/redefinir_senha?token={token}
+    reset_url = f"https://petdor.streamlit.app/redefinir_senha?token={token}"
 
-Para ativar sua conta, acesse o link abaixo:
-{link}
-
-Se você não fez este cadastro, pode ignorar esta mensagem.
-
-Abraços,
-Equipe PETDor
-""".strip()
-    return _enviar_email(destinatario, assunto, corpo_html, corpo_texto)
-
-# -------------------------------------------------
-# Recuperação de senha
-# -------------------------------------------------
-def enviar_email_recuperacao_senha(
-    destinatario: str,
-    nome_usuario: str,
-    token: str,
-) -> bool:
-    """
-    Envia e-mail com link de recuperação de senha.
-    Usado por auth.password_reset.reset_password_request.
-    """
-    assunto = "Recuperação de senha - PETDor"
-    # LINK CORRIGIDO: Agora aponta para https://petdor.streamlit.app
-    link = f"{APP_BASE_URL}/?pagina=reset_senha&token={token}"
     corpo_html = f"""
     <html>
-      <body>
-        <p>Olá, {nome_usuario},</p>
-        <p>Recebemos uma solicitação para redefinir a senha da sua conta PETDor.</p>
-        <p>Para redefinir sua senha, clique no link abaixo:</p>
-        <p><a href="{link}">🔗 Redefinir minha senha</a></p>
-        <p><small>Se o botão não funcionar, copie e cole este link no seu navegador:</small></p>
-        <p><code>{link}</code></p>
-        <p>Se você não fez esta solicitação, pode ignorar este e-mail.</p>
-        <p>Abraços,<br>Equipe PETDor</p>
-      </body>
+        <body>
+            <p>Olá, {nome_usuario},</p>
+            <p>Recebemos uma solicitação para redefinir a senha da sua conta PETDor.</p>
+            <p>Por favor, clique no link abaixo para criar uma nova senha:</p>
+            <p><a href="{reset_url}">Redefinir Senha</a></p>
+            <p>Este link é válido por 1 hora. Se você não solicitou a redefinição de senha, por favor, ignore este e-mail.</p>
+            <p>Atenciosamente,</p>
+            <p>Equipe PETDor</p>
+        </body>
     </html>
     """
-    corpo_texto = f"""
-Olá, {nome_usuario},
+    return _enviar_email_generico(destinatario, assunto, corpo_html)
 
-Recebemos uma solicitação para redefinir a senha da sua conta PETDor.
-
-Para redefinir sua senha, acesse o link abaixo:
-{link}
-
-Se você não fez esta solicitação, pode ignorar esta mensagem.
-
-Abraços,
-Equipe PETDor
-""".strip()
-    return _enviar_email(destinatario, assunto, corpo_html, corpo_texto)
+# Você pode adicionar outras funções de envio de e-mail aqui, se necessário.

@@ -1,4 +1,4 @@
-# PETdor_2.0/auth/user.py
+# PETdor_2_0/auth/user.py
 import streamlit as st
 import logging
 from datetime import datetime
@@ -237,4 +237,3 @@ def atualizar_tipo_usuario(user_id, tipo_usuario):
     finally:
         if conn:
             conn.close()
-

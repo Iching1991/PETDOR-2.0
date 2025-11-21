@@ -5,7 +5,7 @@ Suporta confirmação de conta e reset de senha.
 """
 import smtplib
 from email.mime.text import MIMEText
-from email.mimeipart import MIMEMultipart
+from email.mime.multipart import MIMEMultipart
 import os
 import logging
 
@@ -42,7 +42,7 @@ def _enviar_email_generico(destinatario: str, assunto: str, corpo_html: str) -> 
         with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
             server.starttls()  # Inicia TLS
             server.login(EMAIL_USER, EMAIL_PASSWORD)
-           .sendmail(EMAIL_SENDER, destinatario, msg.as_string())
+            server.sendmail(EMAIL_SENDER, destinatario, msg.as_string())
 
         logger.info(f"E-mail enviado com sucesso para {destinatario} (Assunto: {assunto})")
         return True

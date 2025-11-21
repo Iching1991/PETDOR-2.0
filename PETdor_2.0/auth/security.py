@@ -1,4 +1,4 @@
-# PETdor_2.0/auth/security.py
+# PETdor_2_0/auth/security.py
 """
 Módulo de segurança do PETDOR
 Inclui hashing de senha, verificação e geração de tokens
@@ -55,4 +55,3 @@ def verify_email_token(token: str) -> bool:
     (A lógica de expiração e uso único é geralmente tratada no banco de dados).
     """
     return bool(token)
-

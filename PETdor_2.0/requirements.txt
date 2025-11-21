@@ -2,11 +2,11 @@ streamlit==1.32.0
 bcrypt==4.2.0
 python-dotenv==1.0.1
 altair==5.2.0
-Pillow==11.0.0
+Pillow==10.4.0
 
 # Dependências essenciais do PETDOR
 pandas==2.2.3
-numpy==2.1.1
+numpy==1.26.4
 matplotlib==3.9.2
 requests==2.31.0
 

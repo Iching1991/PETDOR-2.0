@@ -4,8 +4,20 @@ import logging
 from datetime import datetime
 import os # Importado para usar os.getenv na criar_tabelas_se_nao_existir
 from database.connection import conectar_db # Importa a função inteligente
-from .security import hash_password, generate_email_token, verify_email_token, verify_password # Adicionado verify_password
+# PETdor_2_0/auth/user.py
+# ...
+from .security import hash_password, generate_email_token, verify_email_token, verify_password # Importa os nomes corretos
 from utils.email_sender import enviar_email_confirmacao # Importação ABSOLUTA corrigida
+# ...
+# Dentro de cadastrar_usuario:
+# senha_hash = hash_password(senha)
+# ...
+# enviar_email_confirmacao(email, nome, token)
+# ...
+# Dentro de verificar_credenciais:
+# ... and verify_password(senha, usuario['senha_hash']):
+# ...
+
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -237,3 +249,4 @@ def atualizar_tipo_usuario(user_id, tipo_usuario):
     finally:
         if conn:
             conn.close()
+

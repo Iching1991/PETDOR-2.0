@@ -6,7 +6,7 @@ import uuid
 import os
 
 from database.connection import conectar_db
-from utils.email_sender import enviar_email_reset_senha
+from ..utils.email_sender import enviar_email_reset_senha
 from auth.security import hash_password
 
 logger = logging.getLogger(__name__)
@@ -132,3 +132,4 @@ def redefinir_senha_com_token(token: str, nova_senha: str):
     finally:
         if conn:
             conn.close()
+

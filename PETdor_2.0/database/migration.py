@@ -1,35 +1,65 @@
+# PETdor_2_0/database/migration.py
 import sqlite3
-from .connection import conectar_db # Importação relativa, mais robusta dentro do pacote
+import os
+from database.connection import conectar_db
+
+
+USANDO_POSTGRES = bool(os.getenv("DB_HOST"))
+
 
 # ==========================================================
-# Função principal para criar todas as tabelas
+# Criar tabelas da estrutura híbrida
 # ==========================================================
 def criar_tabelas():
     conn = conectar_db()
     cursor = conn.cursor()
+
     # -------------------------------
-    # Tabela de usuários
+    # Tabela de Usuários
     # -------------------------------
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            senha_hash TEXT NOT NULL,
-            tipo_usuario TEXT NOT NULL,              -- tutor, veterinario, clinica
-            pais TEXT,
-            email_confirmado INTEGER DEFAULT 0,
-            email_confirm_token TEXT,                -- <--- ADICIONADO: Coluna para o token de confirmação
-            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            ativo INTEGER DEFAULT 1
-        );
-    """)
+    if USANDO_POSTGRES:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id BIGSERIAL PRIMARY KEY,
+                nome TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                senha_hash TEXT NOT NULL,
+                tipo_usuario TEXT NOT NULL DEFAULT 'Tutor',
+                pais TEXT DEFAULT 'Brasil',
+
+                email_confirmado BOOLEAN NOT NULL DEFAULT FALSE,
+                email_confirm_token TEXT UNIQUE,
+
+                reset_password_token TEXT UNIQUE,
+                reset_password_expires TIMESTAMPTZ,
+
+                ativo BOOLEAN NOT NULL DEFAULT TRUE,
+                criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        """)
+    else:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                senha_hash TEXT NOT NULL,
+                tipo_usuario TEXT NOT NULL DEFAULT 'Tutor',
+                pais TEXT DEFAULT 'Brasil',
+
+                email_confirmado INTEGER DEFAULT 0,
+                email_confirm_token TEXT,
+
+                reset_password_token TEXT,
+                reset_password_expires TIMESTAMP,
+
+                ativo INTEGER DEFAULT 1,
+                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
     # -------------------------------
-    # Tokens de confirmação de e-mail (Esta tabela pode ser removida se o token for direto no usuário)
-    # No seu código atual, o token está sendo salvo na tabela 'usuarios', então esta tabela 'email_confirmacoes'
-    # não está sendo usada para o token em si, mas pode ser para logs ou histórico.
-    # Se você não for usar esta tabela, pode removê-la para simplificar.
-    # Por enquanto, vamos mantê-la como está, mas o token principal vai para 'usuarios'.
+    # LOG — Confirmação de E-mail
     # -------------------------------
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_confirmacoes (
@@ -41,8 +71,9 @@ def criar_tabelas():
             FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
         );
     """)
+
     # -------------------------------
-    # Tokens de recuperação de senha
+    # LOG — Resets de Senha
     # -------------------------------
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS password_resets (
@@ -54,6 +85,7 @@ def criar_tabelas():
             FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
         );
     """)
+
     # -------------------------------
     # Tabela de Pets
     # -------------------------------
@@ -69,6 +101,7 @@ def criar_tabelas():
             FOREIGN KEY (tutor_id) REFERENCES usuarios(id)
         );
     """)
+
     # -------------------------------
     # Tabela de Avaliações
     # -------------------------------
@@ -85,36 +118,37 @@ def criar_tabelas():
             FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
         );
     """)
+
     conn.commit()
     conn.close()
-    print("✔ Banco atualizado: Todas as tabelas foram criadas com sucesso.")
+    print("✔ Banco atualizado: tabelas principais e de log criadas com sucesso.")
+
 
 # ==========================================================
-# Migração completa (ponto único de entrada para migrações)
+# Migração completa
 # ==========================================================
 def migrar_banco_completo():
     """
-    Executa todas as migrações necessárias para deixar o banco atualizado.
-    No momento:
-    - Cria as tabelas, se não existirem (criar_tabelas).
-    Futuras migrações (ex: novas colunas, flags de desativação, etc.)
-    podem ser adicionadas aqui em sequência.
+    Executa todas as migrações necessárias.
+    Não reseta o banco automaticamente.
     """
-    resetar_banco() # Reseta o banco para garantir a nova estrutura
     criar_tabelas()
-    print("✔ Migração completa executada (criação/atualização de tabelas).")
+    print("✔ Migração completa executada com sucesso.")
+
 
 # ==========================================================
-# Utilitário opcional para resetar o banco (apenas dev)
+# Resetar banco (apenas desenvolvedor)
 # ==========================================================
 def resetar_banco():
     conn = conectar_db()
     cursor = conn.cursor()
+
     cursor.execute("DROP TABLE IF EXISTS avaliacoes")
     cursor.execute("DROP TABLE IF EXISTS pets")
     cursor.execute("DROP TABLE IF EXISTS password_resets")
     cursor.execute("DROP TABLE IF EXISTS email_confirmacoes")
     cursor.execute("DROP TABLE IF EXISTS usuarios")
+
     conn.commit()
     conn.close()
-    print("⚠ Banco de dados resetado (modo DEV).")
+    print("⚠ Banco resetado (DEV).")

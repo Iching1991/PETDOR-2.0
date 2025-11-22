@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 from database.connection import conectar_db
 from .security import hash_password, generate_email_token, verify_email_token, verify_password
-from utils.email_sender import enviar_email_confirmacao  # ← CONFIRA SE ESTE NOME EXISTE!
+from ..utils.email_sender import enviar_email_confirmacao
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -194,3 +194,4 @@ def redefinir_senha(email, nova_senha):
     finally:
         if conn:
             conn.close()
+

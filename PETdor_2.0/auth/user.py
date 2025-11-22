@@ -5,7 +5,7 @@ import os
 from database.connection import conectar_db
 from .security import hash_password, generate_email_token, verify_email_token, verify_password
 # CORREÇÃO: Alterar importação relativa para absoluta
-from utils.email_sender import enviar_email_confirmacao 
+from PETdor_2_0.utils.email_sender import enviar_email_confirmacao
 import uuid
 logger = logging.getLogger(__name__)
 
@@ -218,3 +218,4 @@ def atualizar_tipo_usuario(user_id, tipo_usuario):
     finally:
         if conn:
             conn.close()
+

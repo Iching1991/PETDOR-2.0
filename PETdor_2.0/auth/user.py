@@ -68,7 +68,7 @@ def cadastrar_usuario(nome, email, senha, tipo_usuario, pais):
         conn = conectar_db()
         cur = conn.cursor()
         senha_hash = hash_password(senha)
-        token = generate_email_token()
+        token = generate_email_token(email)
 
         # CORREÇÃO: Usar '?' para placeholders do SQLite e 0 para FALSE
         cur.execute("""
@@ -254,3 +254,4 @@ def atualizar_tipo_usuario(user_id, tipo_usuario):
     finally:
         if conn:
             conn.close()
+

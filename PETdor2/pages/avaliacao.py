@@ -1,16 +1,25 @@
 # PETdor2/pages/avaliacao.py
 
+import sys
+import os
 import streamlit as st
 from datetime import datetime
 
-from PETdor2.database.connection import conectar_db
-from PETdor2.database.models import Pet
+# --- Corrige importações para Streamlit Cloud ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.abspath(os.path.join(current_dir, ".."))
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
+# --- Fim correção ---
+
+# Importações locais
+from database.connection import conectar_db
+from database.models import Pet
 from especies import (
     get_especies_nomes,
     buscar_especie_por_id,
     get_escala_labels,
 )
-
 
 # ==========================================================
 # Carregar pets do usuário
@@ -90,11 +99,7 @@ def render():
     # ---------------------------------------------
     # Selecionar espécie → montar escala certa
     # ---------------------------------------------
-    especie = None
-    for p in pets:
-        if p["id"] == pet_id:
-            especie = p["especie"]
-            break
+    especie = next((p["especie"] for p in pets if p["id"] == pet_id), None)
 
     if not especie:
         st.error("Erro ao identificar a espécie do pet.")

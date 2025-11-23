@@ -1,11 +1,13 @@
-# PETdor_2_0/auth/email_confirmation.py
+# PETdor2/auth/email_confirmation.py
 
 import logging
-from database.connection import conectar_db
-from auth.security import verify_email_token
-from utils.email_sender import enviar_email_confirmacao
+
+from PETdor2.database.connection import conectar_db
+from PETdor2.auth.security import verify_email_token
+from PETdor2.utils.email_sender import enviar_email_confirmacao
 
 logger = logging.getLogger(__name__)
+
 
 def confirmar_email(token: str) -> bool:
     """
@@ -21,7 +23,6 @@ def confirmar_email(token: str) -> bool:
         conn = conectar_db()
         cursor = conn.cursor()
 
-        # Busca o usuário correspondente ao token e ainda não confirmado
         cursor.execute("""
             SELECT id FROM usuarios 
             WHERE email = ? AND email_confirm_token = ? AND email_confirmado = 0
@@ -30,7 +31,7 @@ def confirmar_email(token: str) -> bool:
         row = cursor.fetchone()
         if not row:
             conn.close()
-            logger.warning(f"Token não corresponde a nenhum usuário ou já confirmado.")
+            logger.warning("Token não corresponde a nenhum usuário ou já confirmado.")
             return False
 
         usuario_id = row["id"]
@@ -80,13 +81,13 @@ def reenviar_email_confirmacao(email: str) -> bool:
         token_existente = row["email_confirm_token"]
         confirmado = row["email_confirmado"]
 
-        # Se já confirmado, não faz sentido reenviar
+        # Se já confirmado, nada a reenviar
         if confirmado == 1:
             logger.info(f"Usuário {email} já está confirmado. Nenhum envio necessário.")
             return True
 
         if not token_existente:
-            logger.warning(f"Usuário {email} sem token de confirmação.")
+            logger.warning(f"Usuário {email} não possui token de confirmação salvo.")
             return False
 
         # Reenvia o e-mail

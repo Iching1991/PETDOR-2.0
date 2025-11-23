@@ -1,35 +1,45 @@
 # PETdor2/database/supabase_client.py
 import os
+import requests
 import logging
-from supabase import create_client, Client
 
 logger = logging.getLogger(__name__)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-supabase: Client | None = None
+HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json"
+}
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    logger.warning("SUPABASE_URL ou SUPABASE_KEY não definidas. Supabase não será inicializado.")
-else:
+def supabase_table_select(table_name: str, limit: int = 10):
+    """Retorna dados de uma tabela"""
     try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-        logger.info("Cliente Supabase inicializado com sucesso.")
+        url = f"{SUPABASE_URL}/rest/v1/{table_name}?limit={limit}"
+        response = requests.get(url, headers=HEADERS)
+        response.raise_for_status()
+        return response.json(), None
     except Exception as e:
-        logger.error(f"Falha ao criar cliente Supabase: {e}")
-        supabase = None
+        logger.error(f"Erro ao consultar tabela {table_name}: {e}", exc_info=True)
+        return None, str(e)
+
+def supabase_table_insert(table_name: str, data: dict):
+    """Insere um registro em uma tabela"""
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/{table_name}"
+        response = requests.post(url, json=data, headers=HEADERS)
+        response.raise_for_status()
+        return True, None
+    except Exception as e:
+        logger.error(f"Erro ao inserir na tabela {table_name}: {e}", exc_info=True)
+        return False, str(e)
 
 def testar_conexao() -> bool:
-    """Testa se a conexão com Supabase está ativa."""
-    if supabase is None:
-        logger.warning("Supabase não inicializado. Conexão não pode ser testada.")
+    """Testa a conexão com a tabela 'usuarios'"""
+    data, err = supabase_table_select("usuarios", limit=1)
+    if err:
+        print(f"Erro ao testar Supabase: {err}")
         return False
-    try:
-        response = supabase.table("usuarios").select("*").limit(1).execute()
-        if response.error:
-            logger.error(f"Erro ao testar Supabase: {response.error.message}")
-        return response.error is None
-    except Exception as e:
-        logger.error(f"Erro inesperado ao testar Supabase: {e}")
-        return False
+    return True

@@ -1,69 +1,38 @@
 # PETdor2/database/connection.py
-
 import os
-import sqlite3
 import psycopg2
-import psycopg2.extras
+from psycopg2.extras import RealDictCursor # Para retornar resultados como dicionários
 import logging
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Caminho do SQLite local (fallback)
-BASE_DIR = Path(__file__).resolve().parent.parent
-SQLITE_DB_PATH = BASE_DIR / "petdor.db"
-
-# Detecta se deve usar PostgreSQL (SUPABASE)
-USANDO_POSTGRES = bool(os.getenv("DB_HOST"))
-
-
-# ==========================================================
-# Conectar ao PostgreSQL (Supabase)
-# ==========================================================
-def conectar_postgres():
+def conectar_db():
+    """
+    Estabelece uma conexão com o banco de dados PostgreSQL (Supabase).
+    Retorna o objeto de conexão.
+    """
     try:
         conn = psycopg2.connect(
             host=os.getenv("DB_HOST"),
             database=os.getenv("DB_NAME"),
             user=os.getenv("DB_USER"),
             password=os.getenv("DB_PASSWORD"),
-            port=os.getenv("DB_PORT", 5432),
-            cursor_factory=psycopg2.extras.RealDictCursor
+            port=os.getenv("DB_PORT", "5432") # Porta padrão do PostgreSQL
         )
-        logger.info("Conectado ao PostgreSQL (Supabase).")
+        # Configura o cursor para retornar resultados como dicionários
+        # Isso é similar ao sqlite3.Row, mas para psycopg2
+        conn.cursor_factory = RealDictCursor 
+        logger.info("Conexão com o banco de dados PostgreSQL estabelecida com sucesso.")
         return conn
-
+    except psycopg2.Error as e:
+        logger.error(f"Erro ao conectar ao banco de dados PostgreSQL: {e}", exc_info=True)
+        st.error(f"Erro ao conectar ao banco de dados. Por favor, tente novamente mais tarde. Detalhes: {e}")
+        st.stop() # Interrompe a execução do Streamlit app
     except Exception as e:
-        logger.error(f"Erro ao conectar no PostgreSQL: {e}", exc_info=True)
-        raise ConnectionError("❌ Não foi possível conectar ao banco PostgreSQL.")
+        logger.error(f"Erro inesperado ao conectar ao banco de dados: {e}", exc_info=True)
+        st.error(f"Erro inesperado ao conectar ao banco de dados. Detalhes: {e}")
+        st.stop() # Interrompe a execução do Streamlit app
 
-
-# ==========================================================
-# Conectar ao SQLite (fallback local)
-# ==========================================================
-def conectar_sqlite():
-    try:
-        conn = sqlite3.connect(SQLITE_DB_PATH)
-        conn.row_factory = sqlite3.Row
-        logger.warning("⚠️ Usando SQLite (modo local).")
-        return conn
-
-    except Exception as e:
-        logger.error(f"Erro ao conectar SQLite: {e}", exc_info=True)
-        raise ConnectionError("❌ Falha ao abrir o banco SQLite.")
-
-
-# ==========================================================
-# Conexão principal (automática)
-# ==========================================================
-def conectar_db():
-    """
-    Seleciona automaticamente o banco:
-
-    ✔ Se existir DB_HOST → PostgreSQL (Supabase)
-    ✔ Senão → SQLite local
-    """
-    if USANDO_POSTGRES:
-        return conectar_postgres()
-
-    return conectar_sqlite()
+# Removendo a função criar_diretorio_db, pois não é mais necessária para PostgreSQL
+# def criar_diretorio_db():
+#     # ... (código anterior removido)

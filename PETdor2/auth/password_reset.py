@@ -1,18 +1,19 @@
-# PETdor_2_0/auth/password_reset.py (REWRITE COMPLETO PARA SUPABASE)
+# PETdor2/auth/password_reset.py
 
 import logging
 from datetime import datetime, timedelta
 import uuid
 import os
 
-from database.connection import conectar_db
-from ..utils.email_sender import enviar_email_reset_senha
-from auth.security import hash_password
+from PETdor2.database.connection import conectar_db
+from PETdor2.utils.email_sender import enviar_email_reset_senha
+from PETdor2.auth.security import hash_password
 
 logger = logging.getLogger(__name__)
 
 # Detecta se está usando PostgreSQL (Supabase)
 USANDO_POSTGRES = bool(os.getenv("DB_HOST"))
+
 
 # ============================================================
 # 1) SOLICITAR RESET DE SENHA
@@ -35,6 +36,7 @@ def solicitar_reset_senha(email: str):
         cur.execute(sql_select, (email,))
         usuario = cur.fetchone()
 
+        # Não revela e-mails inexistentes
         if not usuario:
             logger.warning(f"Tentativa de reset para email inexistente: {email}")
             return True
@@ -56,6 +58,7 @@ def solicitar_reset_senha(email: str):
     except Exception as e:
         logger.error(f"Erro no reset de senha ({email}): {e}", exc_info=True)
         return False
+
     finally:
         if conn:
             conn.close()
@@ -74,10 +77,13 @@ def validar_token_reset(token: str):
         cur = conn.cursor()
 
         sql = (
-            "SELECT email, reset_password_expires FROM usuarios WHERE reset_password_token=%s"
+            "SELECT email, reset_password_expires "
+            "FROM usuarios WHERE reset_password_token=%s"
             if USANDO_POSTGRES else
-            "SELECT email, reset_password_expires FROM usuarios WHERE reset_password_token=?"
+            "SELECT email, reset_password_expires "
+            "FROM usuarios WHERE reset_password_token=?"
         )
+
         cur.execute(sql, (token,))
         usuario = cur.fetchone()
 
@@ -93,6 +99,7 @@ def validar_token_reset(token: str):
     except Exception as e:
         logger.error(f"Erro ao validar token: {e}", exc_info=True)
         return None
+
     finally:
         if conn:
             conn.close()
@@ -129,7 +136,7 @@ def redefinir_senha_com_token(token: str, nova_senha: str):
     except Exception as e:
         logger.error(f"Erro ao redefinir senha: {e}", exc_info=True)
         return False, "Erro interno ao redefinir senha."
+
     finally:
         if conn:
             conn.close()
-

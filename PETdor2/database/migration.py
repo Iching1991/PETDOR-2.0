@@ -2,6 +2,7 @@
 import logging
 from database.connection import conectar_db
 import streamlit as st # Para exibir mensagens de erro no Streamlit
+import psycopg2 # Para capturar erros específicos do psycopg2
 
 logger = logging.getLogger(__name__)
 
@@ -72,74 +73,69 @@ def migrar_banco_completo():
         """)
         logger.info("Tabela 'backups' verificada/criada.")
 
+        # --- Migrações de Colunas (se necessário) ---
+        # Exemplo: Adicionar coluna 'ativo' se não existir
+        try:
+            cur.execute("ALTER TABLE usuarios ADD COLUMN ativo BOOLEAN NOT NULL DEFAULT TRUE;")
+            conn.commit()
+            logger.info("Coluna 'ativo' adicionada à tabela 'usuarios'.")
+        except psycopg2.errors.DuplicateColumn:
+            conn.rollback() # Rollback da transação se a coluna já existe
+            logger.info("Coluna 'ativo' já existe na tabela 'usuarios'.")
+        except Exception as e:
+            conn.rollback()
+            logger.warning(f"Erro ao adicionar coluna 'ativo': {e}")
+
+        # Exemplo: Adicionar coluna 'email_confirmado' se não existir
+        try:
+            cur.execute("ALTER TABLE usuarios ADD COLUMN email_confirmado BOOLEAN NOT NULL DEFAULT FALSE;")
+            conn.commit()
+            logger.info("Coluna 'email_confirmado' adicionada à tabela 'usuarios'.")
+        except psycopg2.errors.DuplicateColumn:
+            conn.rollback()
+            logger.info("Coluna 'email_confirmado' já existe na tabela 'usuarios'.")
+        except Exception as e:
+            conn.rollback()
+            logger.warning(f"Erro ao adicionar coluna 'email_confirmado': {e}")
+
+        # Exemplo: Adicionar coluna 'reset_password_token' se não existir
+        try:
+            cur.execute("ALTER TABLE usuarios ADD COLUMN reset_password_token TEXT UNIQUE;")
+            conn.commit()
+            logger.info("Coluna 'reset_password_token' adicionada à tabela 'usuarios'.")
+        except psycopg2.errors.DuplicateColumn:
+            conn.rollback()
+            logger.info("Coluna 'reset_password_token' já existe na tabela 'usuarios'.")
+        except Exception as e:
+            conn.rollback()
+            logger.warning(f"Erro ao adicionar coluna 'reset_password_token': {e}")
+
+        # Exemplo: Adicionar coluna 'reset_password_expires' se não existir
+        try:
+            cur.execute("ALTER TABLE usuarios ADD COLUMN reset_password_expires TIMESTAMPTZ;")
+            conn.commit()
+            logger.info("Coluna 'reset_password_expires' adicionada à tabela 'usuarios'.")
+        except psycopg2.errors.DuplicateColumn:
+            conn.rollback()
+            logger.info("Coluna 'reset_password_expires' já existe na tabela 'usuarios'.")
+        except Exception as e:
+            conn.rollback()
+            logger.warning(f"Erro ao adicionar coluna 'reset_password_expires': {e}")
+
         conn.commit()
-        logger.info("Migração de banco de dados concluída com sucesso para Supabase.")
+        logger.info("Migração do banco de dados concluída com sucesso.")
 
     except psycopg2.Error as e:
         if conn:
             conn.rollback()
-        logger.error(f"Erro na migração do banco de dados (Supabase): {e}", exc_info=True)
-        st.error(f"Erro crítico na inicialização do banco de dados. Por favor, contate o suporte. Detalhes: {e}")
+        logger.error(f"Erro de banco de dados durante a migração: {e}", exc_info=True)
+        st.error(f"Erro crítico ao inicializar o banco de dados. Por favor, contate o suporte. Detalhes: {e}")
         st.stop()
     except Exception as e:
         if conn:
             conn.rollback()
-        logger.error(f"Erro inesperado na migração do banco de dados: {e}", exc_info=True)
-        st.error(f"Erro inesperado na inicialização do banco de dados. Detalhes: {e}")
-        st.stop()
-    finally:
-        if conn:
-            conn.close()
-
-# Função para migrar colunas de desativação (se necessário, adapte para PostgreSQL)
-def migrar_colunas_desativacao():
-    """
-    Adiciona colunas 'ativo' e 'email_confirmado' à tabela 'usuarios' se não existirem.
-    (Esta função pode ser integrada diretamente na migração completa ou chamada separadamente).
-    """
-    conn = None
-    try:
-        conn = conectar_db()
-        cur = conn.cursor()
-
-        # Verifica e adiciona 'ativo'
-        cur.execute("""
-            DO $$
-            BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='ativo') THEN
-                    ALTER TABLE usuarios ADD COLUMN ativo BOOLEAN NOT NULL DEFAULT TRUE;
-                END IF;
-            END
-            $$;
-        """)
-        logger.info("Coluna 'ativo' na tabela 'usuarios' verificada/adicionada.")
-
-        # Verifica e adiciona 'email_confirmado'
-        cur.execute("""
-            DO $$
-            BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='email_confirmado') THEN
-                    ALTER TABLE usuarios ADD COLUMN email_confirmado BOOLEAN NOT NULL DEFAULT FALSE;
-                END IF;
-            END
-            $$;
-        """)
-        logger.info("Coluna 'email_confirmado' na tabela 'usuarios' verificada/adicionada.")
-
-        conn.commit()
-        logger.info("Migração de colunas de desativação concluída.")
-
-    except psycopg2.Error as e:
-        if conn:
-            conn.rollback()
-        logger.error(f"Erro na migração de colunas de desativação (Supabase): {e}", exc_info=True)
-        st.error(f"Erro na migração de colunas. Detalhes: {e}")
-        st.stop()
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        logger.error(f"Erro inesperado na migração de colunas: {e}", exc_info=True)
-        st.error(f"Erro inesperado na migração de colunas. Detalhes: {e}")
+        logger.error(f"Erro inesperado durante a migração do banco de dados: {e}", exc_info=True)
+        st.error(f"Erro inesperado ao inicializar o banco de dados. Detalhes: {e}")
         st.stop()
     finally:
         if conn:

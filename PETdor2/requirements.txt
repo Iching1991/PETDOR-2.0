@@ -2,13 +2,8 @@ streamlit==1.32.0
 bcrypt==4.2.0
 python-dotenv==1.0.1
 altair==5.2.0
-
-# CORRIGIDO — compatível com Streamlit
 Pillow==10.4.0
-
-# CORRIGIDO — compatível com Streamlit
 numpy==1.26.4
-
 pandas==2.2.3
 matplotlib==3.9.2
 requests==2.31.0
@@ -18,4 +13,4 @@ email-validator==2.1.0.post1
 cryptography==43.0.1
 jinja2==3.1.3
 pyjwt==2.8.0
-psycopg2-binary==2.9.9 # Ou a versão mais recente compatível
+psycopg2-binary==2.9.9 # Adicione esta linha

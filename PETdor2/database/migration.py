@@ -1,7 +1,7 @@
 # PETdor2/database/migration.py
 import logging
 import streamlit as st
-from database.supabase_client import supabase
+from database.supabase_client import supabase_table_select, supabase_table_insert
 
 logger = logging.getLogger(__name__)
 
@@ -76,3 +76,4 @@ def migrar_banco_completo():
             st.warning(f"Erro ao criar/verificar tabela {nome_tabela}: {e}")
 
     logger.info("Migração do banco de dados concluída.")
+

@@ -4,13 +4,14 @@ Pacote para gerenciamento de banco de dados do PETDOR.
 Contém módulos para migração e modelos de dados usando Supabase.
 """
 import logging
-
-# Importações relativas para módulos dentro do pacote database
+# Inicializa o pacote database
 from . import migration
 from . import models
-from . import supabase_client  # cliente Supabase configurado
+from . import supabase_client
+
 
 logger = logging.getLogger(__name__)
 
 # Exponha os módulos que devem ser acessíveis diretamente do pacote database
 __all__ = ["migration", "models", "supabase_client"]
+

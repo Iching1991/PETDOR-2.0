@@ -1,15 +1,16 @@
+# PETdor2/pages/confirmar_email.py
+
 import streamlit as st
-from auth.email_confirmation import confirmar_email
+from PETdor2.auth.email_confirmation import confirmar_email
 
-st.set_page_config(page_title="Confirmar E-mail - PETDor")
 
-def main():
-    st.title("📨 Confirmar E-mail")
+def render():
+    st.title("📨 Confirmação de E-mail")
 
     token = st.query_params.get("token", None)
 
     if not token:
-        st.error("Token não fornecido.")
+        st.error("Token não fornecido na URL.")
         return
 
     with st.spinner("Validando token..."):
@@ -18,8 +19,12 @@ def main():
     if sucesso:
         st.success(msg)
         st.info("Agora você já pode fazer login.")
-        st.page_link("pages/login.py", label="Ir para Login")
+
+        # Ajuste para navegação interna do Streamlit
+        if st.button("Ir para Login"):
+            st.session_state.pagina = "login"
+            st.experimental_rerun()
+
     else:
         st.error(msg)
-
-main()
+        st.warning("Peça um novo link na página de login.")

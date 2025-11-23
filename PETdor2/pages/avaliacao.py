@@ -16,7 +16,7 @@ if root_dir not in sys.path:
 # Importações locais
 from database.connection import conectar_db
 from database.models import Pet
-from especies import get_especies_nomes, buscar_especie_por_id, get_escala_labels
+from especies.index import get_especies_nomes, buscar_especie_por_id, get_escala_labels
 
 # ==========================================================
 # Funções de acesso ao banco

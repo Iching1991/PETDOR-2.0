@@ -1,49 +1,70 @@
-import time
-import hashlib
-import secrets
+# PETdor2/utils/tokens.py
 
-# Tempo padrão de expiração: 1 hora
-TOKEN_EXPIRATION = 3600  
+"""
+Módulo unificado de tokens para o PETdor2.
+Gera e valida tokens JWT para:
+- Confirmação de e-mail
+- Redefinição de senha
+"""
 
+import os
+from datetime import datetime, timedelta
+import jwt
 
-# ========================================
-# GERAR TOKEN SIMPLES
-# ========================================
-def gerar_token_simples(email):
-    """
-    Gera um token baseado em email + timestamp + segredo aleatório.
-    Ideal para confirmação de email e reset de senha.
-    """
-    timestamp = int(time.time())
-    segredo = secrets.token_hex(16)
-    base = f"{email}:{timestamp}:{segredo}"
+# Chave secreta (use variável de ambiente em produção)
+SECRET_KEY = os.getenv("SECRET_KEY", "chave_super_secreta_petdor")
+ALGORITHM = "HS256"
 
-    token_hash = hashlib.sha256(base.encode()).hexdigest()
-
-    # Retornamos um token verificável contendo hash + timestamp + email
-    return f"{token_hash}:{timestamp}:{email}"
+# Expirações
+EMAIL_TOKEN_EXPIRE_HOURS = 24
+RESET_TOKEN_EXPIRE_HOURS = 1
 
 
-# ========================================
-# VALIDAR TOKEN
-# ========================================
-def validar_token_simples(token_recebido):
-    """
-    Valida token gerado por gerar_token_simples.
-    Retorna o email se válido, senão retorna None.
-    """
+# ==========================================================
+# GERAR TOKEN DE CONFIRMAÇÃO DE E-MAIL
+# ==========================================================
+def gerar_token_confirmacao(email: str) -> str:
+    payload = {
+        "sub": email,
+        "type": "email_confirmation",
+        "exp": datetime.utcnow() + timedelta(hours=EMAIL_TOKEN_EXPIRE_HOURS)
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+# ==========================================================
+# VALIDAR TOKEN DE CONFIRMAÇÃO DE E-MAIL
+# ==========================================================
+def validar_token_confirmacao(token: str) -> str | None:
     try:
-        token_hash, timestamp_str, email = token_recebido.split(":")
-        timestamp = int(timestamp_str)
-
-        # Verifica se expirou
-        if time.time() - timestamp > TOKEN_EXPIRATION:
+        dados = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if dados.get("type") != "email_confirmation":
             return None
+        return dados.get("sub")
+    except Exception:
+        return None
 
-        # Como o segredo é aleatório, não conseguimos recalcular o hash.
-        # Porém, a estrutura do token garante que apenas tokens criados aqui
-        # possuem este formato. Assim, validamos apenas o tempo e o formato.
-        return email
 
+# ==========================================================
+# GERAR TOKEN DE RESET DE SENHA
+# ==========================================================
+def gerar_token_reset(email: str) -> str:
+    payload = {
+        "sub": email,
+        "type": "password_reset",
+        "exp": datetime.utcnow() + timedelta(hours=RESET_TOKEN_EXPIRE_HOURS)
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+# ==========================================================
+# VALIDAR TOKEN DE RESET DE SENHA
+# ==========================================================
+def validar_token_reset(token: str) -> str | None:
+    try:
+        dados = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if dados.get("type") != "password_reset":
+            return None
+        return dados.get("sub")
     except Exception:
         return None

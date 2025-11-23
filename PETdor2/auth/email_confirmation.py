@@ -1,14 +1,9 @@
 # PETdor2/auth/email_confirmation.py
 import logging
-import os
-from database.supabase_client import supabase
-from auth.security import verify_email_token, generate_email_token
-from utils.email_sender import enviar_email_confirmacao
-
 logger = logging.getLogger(__name__)
 
 # ==========================
-# Confirmar email
+# Confirmar e-mail
 # ==========================
 def confirmar_email(token: str) -> tuple[bool, str]:
     """
@@ -16,6 +11,9 @@ def confirmar_email(token: str) -> tuple[bool, str]:
     Retorna (True, msg) ou (False, msg).
     """
     try:
+        from database.supabase_client import supabase  # import local
+        from auth.security import verify_email_token
+
         email = verify_email_token(token)
         if not email:
             return False, "Token inválido ou expirado."
@@ -54,7 +52,7 @@ def confirmar_email(token: str) -> tuple[bool, str]:
 
 
 # ==========================
-# Reenviar email de confirmação
+# Reenviar e-mail de confirmação
 # ==========================
 def reenviar_email_confirmacao(email: str) -> tuple[bool, str]:
     """
@@ -62,6 +60,11 @@ def reenviar_email_confirmacao(email: str) -> tuple[bool, str]:
     Nunca revela se o e-mail existe ou não.
     """
     try:
+        from database.supabase_client import supabase  # import local
+        from auth.security import generate_email_token
+        from utils.email_sender import enviar_email_confirmacao as enviar_email  # função de envio de email
+        from os import getenv
+
         # Buscar usuário
         resp = supabase.table("usuarios").select("*").eq("email", email.lower()).execute()
         if resp.error:
@@ -89,11 +92,16 @@ def reenviar_email_confirmacao(email: str) -> tuple[bool, str]:
             logger.error(f"Erro ao atualizar token de usuário {usuario['id']}: {upd_resp.error.message}")
             return False, "Erro interno ao reenviar e-mail de confirmação."
 
+        # Criar link de confirmação
+        confirm_link = f"{getenv('STREAMLIT_APP_URL')}?action=confirm_email&token={novo_token}"
+
         # Enviar e-mail
-        email_ok = enviar_email_confirmacao(email, usuario["nome"], novo_token)
+        email_ok, msg = enviar_email(email, usuario["nome"], confirm_link)
         if email_ok:
+            logger.info(f"E-mail de confirmação reenviado para {email}")
             return True, "E-mail de confirmação reenviado."
         else:
+            logger.warning(f"Falha ao enviar e-mail de confirmação para {email}: {msg}")
             return False, "Erro ao enviar e-mail de confirmação."
 
     except Exception:

@@ -3,28 +3,29 @@ import streamlit as st
 import sys
 import os
 
-# --- INÍCIO DA CORREÇÃO DE IMPORTAÇÃO ---
-# Adiciona o diretório atual (PETdor2) ao sys.path para resolver importações absolutas
+# --- Corrige importações para Streamlit Cloud ---
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 if current_script_dir not in sys.path:
     sys.path.insert(0, current_script_dir)
-# --- FIM DA CORREÇÃO DE IMPORTAÇÃO ---
+# --- Fim correção ---
 
-# Importações absolutas corrigidas
-from PETdor2.database.migration import migrar_banco_completo
-from PETdor2.auth.user import (
+# Importações de banco e auth
+from database.migration import migrar_banco_completo
+from auth.user import (
     cadastrar_usuario,
     verificar_credenciais,
     buscar_usuario_por_email,
     confirmar_email,
 )
-from PETdor2.auth.password_reset import (
+from auth.password_reset import (
     solicitar_reset_senha,
     validar_token_reset,
     redefinir_senha_com_token,
 )
-from PETdor2.pages.cadastro_pet import app as cadastro_pet_app
-from PETdor2.pages.avaliacao import app as avaliacao_app
+
+# Importações das páginas
+from pages.cadastro_pet import app as cadastro_pet_app
+from pages.avaliacao import app as avaliacao_app
 
 # 🔧 Inicializa banco
 migrar_banco_completo()
@@ -33,7 +34,7 @@ migrar_banco_completo()
 st.set_page_config(page_title="PETDOR – Avaliação de Dor", layout="centered")
 st.title("🐾 PETDOR – Sistema PETDOR")
 
-# --- Lógica de parâmetros de URL ---
+# --- Lógica de URL parameters ---
 query_params = st.query_params
 if "token" in query_params and "action" in query_params:
     token = query_params["token"]
@@ -70,8 +71,10 @@ if "token" in query_params and "action" in query_params:
                 st.query_params.clear()
                 st.stop()
         st.stop()
+# --- Fim lógica URL parameters ---
 
-# --- Menu lateral ---
+
+# Menu lateral
 menu = st.sidebar.selectbox("Menu", ["Login", "Criar Conta", "Redefinir Senha"])
 
 # -------------------------------
@@ -135,6 +138,7 @@ elif menu == "Redefinir Senha":
             st.info(msg)
         else:
             st.error(msg)
+
     st.markdown("---")
     st.write("Ou, se você já tem um token e não está usando o link do e-mail:")
     token_input = st.text_input("Token de redefinição", key="reset_token_manual")
@@ -158,7 +162,7 @@ elif menu == "Redefinir Senha":
                 st.error(msg_validacao)
 
 # -------------------------------
-# Páginas do app (após login)
+# Páginas do app após login
 # -------------------------------
 if st.session_state.get("logged_in"):
     st.sidebar.markdown("---")
@@ -166,9 +170,8 @@ if st.session_state.get("logged_in"):
         "Avaliação de Dor": avaliacao_app,
         "Cadastro de Pet": cadastro_pet_app,
     }
-
     if st.session_state.user_type == "Admin":
-        app_pages["Administração"] = None
+        app_pages["Administração"] = None  # Substitua por app de admin
 
     selected_app_page = st.sidebar.selectbox(
         "Navegar",
@@ -180,7 +183,9 @@ if st.session_state.get("logged_in"):
         avaliacao_app()
     elif selected_app_page == "Cadastro de Pet":
         cadastro_pet_app()
-    
+    # elif selected_app_page == "Administração":
+    #     admin_app()
+
     if st.sidebar.button("Sair"):
         st.session_state.clear()
         st.rerun()

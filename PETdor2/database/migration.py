@@ -1,197 +1,113 @@
 # PETdor2/database/migration.py
-
 import os
-from PETdor2.database.connection import conectar_db
+from .connection import conectar_db
+import logging
+import streamlit as st # Para exibir mensagens de erro no Streamlit
 
-USANDO_POSTGRES = bool(os.getenv("DB_HOST"))
+logger = logging.getLogger(__name__)
 
-
-# ==========================================================
-# Criar tabelas principais (usuários, pets, avaliações)
-# ==========================================================
-def criar_tabelas():
-    conn = conectar_db()
-    cursor = conn.cursor()
-
-    # -------------------------------
-    # Tabela de Usuários
-    # -------------------------------
-    if USANDO_POSTGRES:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS usuarios (
-                id SERIAL PRIMARY KEY,
-                nome TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                senha_hash TEXT NOT NULL,
-                tipo_usuario TEXT NOT NULL DEFAULT 'Tutor',
-                pais TEXT DEFAULT 'Brasil',
-
-                email_confirmado BOOLEAN NOT NULL DEFAULT FALSE,
-                email_confirm_token TEXT UNIQUE,
-
-                reset_password_token TEXT,
-                reset_password_expires TIMESTAMPTZ,
-
-                ativo BOOLEAN NOT NULL DEFAULT TRUE,
-                criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            );
-        """)
-    else:  # SQLite
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS usuarios (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nome TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                senha_hash TEXT NOT NULL,
-                tipo_usuario TEXT NOT NULL DEFAULT 'Tutor',
-                pais TEXT DEFAULT 'Brasil',
-
-                email_confirmado INTEGER DEFAULT 0,
-                email_confirm_token TEXT,
-
-                reset_password_token TEXT,
-                reset_password_expires TIMESTAMP,
-
-                ativo INTEGER DEFAULT 1,
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-
-    # -------------------------------
-    # LOG — Confirmação de e-mail
-    # -------------------------------
-    if USANDO_POSTGRES:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS email_confirmacoes (
-                id SERIAL PRIMARY KEY,
-                usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
-                token TEXT NOT NULL,
-                criado_em TIMESTAMPTZ DEFAULT NOW(),
-                expirado BOOLEAN DEFAULT FALSE
-            );
-        """)
-    else:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS email_confirmacoes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                usuario_id INTEGER NOT NULL,
-                token TEXT NOT NULL,
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                expirado INTEGER DEFAULT 0,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            );
-        """)
-
-    # -------------------------------
-    # LOG — Resets de senha
-    # -------------------------------
-    if USANDO_POSTGRES:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS password_resets (
-                id SERIAL PRIMARY KEY,
-                usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
-                token TEXT NOT NULL,
-                criado_em TIMESTAMPTZ DEFAULT NOW(),
-                utilizado BOOLEAN DEFAULT FALSE
-            );
-        """)
-    else:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS password_resets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                usuario_id INTEGER NOT NULL,
-                token TEXT NOT NULL,
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                utilizado INTEGER DEFAULT 0,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            );
-        """)
-
-    # -------------------------------
-    # Tabela de Pets
-    # -------------------------------
-    if USANDO_POSTGRES:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS pets (
-                id SERIAL PRIMARY KEY,
-                nome TEXT NOT NULL,
-                especie TEXT NOT NULL,
-                idade INTEGER,
-                peso REAL,
-                tutor_id INTEGER NOT NULL REFERENCES usuarios(id),
-                criado_em TIMESTAMPTZ DEFAULT NOW()
-            );
-        """)
-    else:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS pets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nome TEXT NOT NULL,
-                especie TEXT NOT NULL,
-                idade INTEGER,
-                peso REAL,
-                tutor_id INTEGER NOT NULL,
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (tutor_id) REFERENCES usuarios(id)
-            );
-        """)
-
-    # -------------------------------
-    # Tabela Avaliações
-    # -------------------------------
-    if USANDO_POSTGRES:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS avaliacoes (
-                id SERIAL PRIMARY KEY,
-                pet_id INTEGER NOT NULL REFERENCES pets(id),
-                usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
-                especie TEXT NOT NULL,
-                respostas_json TEXT NOT NULL,
-                pontuacao_total REAL NOT NULL,
-                criado_em TIMESTAMPTZ DEFAULT NOW()
-            );
-        """)
-    else:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS avaliacoes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pet_id INTEGER NOT NULL,
-                usuario_id INTEGER NOT NULL,
-                especie TEXT NOT NULL,
-                respostas_json TEXT NOT NULL,
-                pontuacao_total REAL NOT NULL,
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (pet_id) REFERENCES pets(id),
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            );
-        """)
-
-    conn.commit()
-    conn.close()
-    print("✔ Banco atualizado: tabelas criadas/validadas com sucesso.")
-
-
-# ==========================================================
-# Migração completa
-# ==========================================================
 def migrar_banco_completo():
-    criar_tabelas()
-    print("✔ Migração completa executada.")
+    """
+    Executa todas as migrações necessárias para o banco de dados PostgreSQL (Supabase).
+    Cria tabelas e colunas se não existirem.
+    """
+    conn = None
+    try:
+        conn = conectar_db()
+        cur = conn.cursor()
 
+        # --- Tabela 'usuarios' ---
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id SERIAL PRIMARY KEY,
+                nome TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                senha_hash TEXT NOT NULL,
+                tipo_usuario TEXT NOT NULL DEFAULT 'Tutor',
+                pais TEXT NOT NULL DEFAULT 'Brasil',
+                email_confirm_token TEXT UNIQUE,
+                email_confirmado BOOLEAN NOT NULL DEFAULT FALSE,
+                ativo BOOLEAN NOT NULL DEFAULT TRUE,
+                data_cadastro TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                reset_password_token TEXT UNIQUE,
+                reset_password_expires TIMESTAMPTZ
+            );
+        """)
+        logger.info("Tabela 'usuarios' verificada/criada.")
 
-# ==========================================================
-# Reset total do banco (apenas DEV)
-# ==========================================================
-def resetar_banco():
-    conn = conectar_db()
-    cursor = conn.cursor()
+        # --- Tabela 'pets' ---
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS pets (
+                id SERIAL PRIMARY KEY,
+                nome TEXT NOT NULL,
+                especie TEXT NOT NULL,
+                raca TEXT,
+                idade INTEGER,
+                peso DECIMAL(5,2),
+                genero TEXT,
+                usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+                data_cadastro TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        """)
+        logger.info("Tabela 'pets' verificada/criada.")
 
-    cursor.execute("DROP TABLE IF EXISTS avaliacoes")
-    cursor.execute("DROP TABLE IF EXISTS pets")
-    cursor.execute("DROP TABLE IF EXISTS password_resets")
-    cursor.execute("DROP TABLE IF EXISTS email_confirmacoes")
-    cursor.execute("DROP TABLE IF EXISTS usuarios")
+        # --- Tabela 'avaliacoes' ---
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS avaliacoes (
+                id SERIAL PRIMARY KEY,
+                pet_id INTEGER REFERENCES pets(id) ON DELETE CASCADE,
+                usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+                data_avaliacao TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                pontuacao_total INTEGER NOT NULL,
+                observacoes TEXT
+            );
+        """)
+        logger.info("Tabela 'avaliacoes' verificada/criada.")
 
-    conn.commit()
-    conn.close()
-    print("⚠ Banco resetado (modo DEV).")
+        # --- Tabela 'respostas_avaliacao' ---
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS respostas_avaliacao (
+                id SERIAL PRIMARY KEY,
+                avaliacao_id INTEGER REFERENCES avaliacoes(id) ON DELETE CASCADE,
+                pergunta_id INTEGER NOT NULL, -- ID da pergunta (ex: 1, 2, 3...)
+                resposta INTEGER NOT NULL,    -- Pontuação da resposta (ex: 0-7)
+                data_resposta TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        """)
+        logger.info("Tabela 'respostas_avaliacao' verificada/criada.")
+
+        # --- Tabela 'especies' (para gerenciar configurações de espécies) ---
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS especies (
+                id SERIAL PRIMARY KEY,
+                nome TEXT NOT NULL UNIQUE,
+                config_json JSONB NOT NULL -- Armazena a configuração da espécie em formato JSON
+            );
+        """)
+        logger.info("Tabela 'especies' verificada/criada.")
+
+        # --- Migração de colunas (se necessário) ---
+        # Exemplo: Adicionar uma coluna 'telefone' à tabela 'usuarios' se ela não existir
+        # cur.execute("""
+        #     DO $$
+        #     BEGIN
+        #         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='telefone') THEN
+        #             ALTER TABLE usuarios ADD COLUMN telefone TEXT;
+        #         END IF;
+        #     END
+        #     $$;
+        # """)
+        # logger.info("Coluna 'telefone' na tabela 'usuarios' verificada/adicionada.")
+
+        conn.commit()
+        logger.info("Migração do banco de dados PostgreSQL concluída com sucesso.")
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Erro durante a migração do banco de dados PostgreSQL: {e}", exc_info=True)
+        st.error(f"Erro crítico ao inicializar o banco de dados. Por favor, contate o suporte. Detalhes: {e}")
+        st.stop() # Interrompe a execução do Streamlit app
+    finally:
+        if conn:
+            conn.close()

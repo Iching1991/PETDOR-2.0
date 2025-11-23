@@ -1,15 +1,15 @@
-# PETdor_2.0/especies/porquinho.py
+# PETdor_2.0/especies/porquinho_da_india.py
 
 """
 🐹 Configuração de avaliação para PORQUINHOS-DA-ÍNDIA
 Escala: 0 a 7 — baseada em sinais comportamentais e clínicos.
 """
 
-from .index import EspecieConfig, Pergunta  # Importação relativa correta
+from .index import EspecieConfig, Pergunta  # Ajuste conforme localização real
 
-CONFIG_PORQUINHO = EspecieConfig(
+CONFIG_PORQUINHO_DA_INDIA = EspecieConfig(
     nome="Porquinho-da-Índia",
-    especie_id="porquinho",
+    especie_id="porquinho_da_india",
     descricao="Avaliação de dor em porquinhos-da-índia — Escala de 0 (nunca) a 7 (sempre).",
     opcoes_escala=[
         "0 - Nunca", "1 - Raramente", "2 - Às vezes", "3 - Frequentemente",

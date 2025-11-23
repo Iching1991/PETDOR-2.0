@@ -35,7 +35,7 @@ def conectar_postgres():
 
     except Exception as e:
         logger.error(f"Erro ao conectar no PostgreSQL: {e}", exc_info=True)
-        raise ConnectionError("Não foi possível conectar ao banco PostgreSQL.")
+        raise ConnectionError("❌ Não foi possível conectar ao banco PostgreSQL.")
 
 
 # ==========================================================
@@ -45,12 +45,12 @@ def conectar_sqlite():
     try:
         conn = sqlite3.connect(SQLITE_DB_PATH)
         conn.row_factory = sqlite3.Row
-        logger.warning("Usando SQLite (modo local).")
+        logger.warning("⚠️ Usando SQLite (modo local).")
         return conn
 
     except Exception as e:
         logger.error(f"Erro ao conectar SQLite: {e}", exc_info=True)
-        raise ConnectionError("Falha ao abrir o banco SQLite.")
+        raise ConnectionError("❌ Falha ao abrir o banco SQLite.")
 
 
 # ==========================================================
@@ -58,11 +58,12 @@ def conectar_sqlite():
 # ==========================================================
 def conectar_db():
     """
-    Decide automaticamente qual banco conectar:
-    - Se existir DB_HOST → PostgreSQL (Supabase)
-    - Caso contrário → SQLite local
+    Seleciona automaticamente o banco:
+
+    ✔ Se existir DB_HOST → PostgreSQL (Supabase)
+    ✔ Senão → SQLite local
     """
     if USANDO_POSTGRES:
         return conectar_postgres()
-    return conectar_sqlite()
 
+    return conectar_sqlite()

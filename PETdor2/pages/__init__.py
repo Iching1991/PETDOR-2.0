@@ -1,6 +1,9 @@
-# pages/__init__.py
-# Módulo de páginas — stubs mínimos para evitar erros de import
-# As páginas serão importadas individualmente onde forem necessárias (ex: em petdor.py)
+"""
+Pacote de páginas da aplicação PETdor2.
+
+Este arquivo apenas registra os módulos disponíveis,
+evitando erros de importação circulares.
+"""
 
 __all__ = [
     "login",
@@ -12,4 +15,5 @@ __all__ = [
     "confirmar_email",
     "recuperar_senha",
     "reset_senha",
+    "admin",
 ]

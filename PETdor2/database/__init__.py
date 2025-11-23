@@ -1,20 +1,19 @@
 # PETdor2/database/__init__.py
+"""
+Pacote para gerenciamento de banco de dados do PETDOR.
+Contém módulos para conexão, migração e modelos de dados.
+"""
 import logging
 import os
-# Removido sqlite3 e Row, pois a conexão será com PostgreSQL (Supabase)
-# from sqlite3 import Row 
+# Não importa sqlite3 aqui, pois estamos focando em PostgreSQL
+# from sqlite3 import Row # Não é necessário para PostgreSQL
 
-# CORREÇÃO: Importação relativa para connection
-from . import connection 
-from .connection import conectar_db # Expondo conectar_db
-from .migration import migrar_banco_completo # Expondo migrar_banco_completo
+# Importações relativas para módulos dentro do pacote database
+from . import connection
+from . import migration
+# from . import models # Se você tiver um módulo models.py
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["conectar_db", "migrar_banco_completo"] # Atualizado para expor as funções corretas
-
-# Docstring conforme memória
-"""
-Este pacote gerencia a conexão e migração do banco de dados para o PETDOR.
-Ele abstrai os detalhes de conexão e garante que a estrutura do banco esteja atualizada.
-"""
+# Exponha as funções/objetos que devem ser acessíveis diretamente do pacote database
+__all__ = ["connection", "migration"] # Adicione "models" se tiver

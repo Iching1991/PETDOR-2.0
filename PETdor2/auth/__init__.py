@@ -18,3 +18,4 @@ __all__ = [
     "password_reset",
     "email_confirmation",
 ]
+

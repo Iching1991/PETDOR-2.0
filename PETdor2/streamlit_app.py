@@ -2,13 +2,12 @@ import sys
 import os
 import streamlit as st
 
-# Corrige caminho raiz do projeto
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR))
+# === Corrige path raiz para permitir imports como "from pages..." ===
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))      # .../PETdor2
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))  # .../mount/src/petdor2/
 
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
-
 
 # ==========================================================
 # CORREÇÃO DE PATH PARA FUNCIONAR NO STREAMLIT CLOUD

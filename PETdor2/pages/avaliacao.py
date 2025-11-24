@@ -5,8 +5,6 @@ from datetime import datetime
 import json
 
 # ===============================================
-# IMPORT CORRETO (OPÇÃO A confirmada)
-# ===============================================
 from PETdor2.database.supabase_client import supabase
 
 from especies.index import (
@@ -145,3 +143,4 @@ def render():
             st.success("Avaliação salva com sucesso! ✅")
         except Exception as e:
             st.error(f"Erro ao salvar avaliação: {e}")
+

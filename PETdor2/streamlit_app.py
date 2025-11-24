@@ -1,6 +1,14 @@
 import sys
 import os
-import streamlit as st
+
+# Diretório do streamlit_app.py
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # .../PETdor2
+# Diretório raiz do projeto (onde PETdor2 está)
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
+
+# Adiciona raiz do projeto ao sys.path
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 # ==========================================
 # CORREÇÃO DE PATH — FUNCIONA NO STREAMLIT CLOUD
@@ -19,14 +27,14 @@ if PROJECT_ROOT not in sys.path:
 
 from pages.login import render as login_app
 from pages.cadastro import render as cadastro_app
-from pages.avaliacao import render as avaliacao_app
-from pages.cadastro_pet import render as cadastro_pet_app
-from pages.historico import render as historico_app
-from pages.admin import render as admin_app
-from pages.conta import render as conta_app
-from pages.confirmar_email import render as confirmar_email_app
-from pages.password_reset import render as password_reset_app
-from pages.recuperar_senha import render as recuperar_senha_app
+from PETdor2.pages.avaliacao import render as avaliacao_app
+from PETdor2.pages.cadastro_pet import render as cadastro_pet_app
+from PETdor2.pages.login import render as login_app
+from PETdor2.pages.admin import render as admin_app
+from PETdor2.pages.conta import render as conta_app
+from PETdor2.pages.confirmar_email import render as confirmar_email_app
+from PETdor2.pages.password_reset import render as password_reset_app
+from PETdor2.pages.recuperar_senha import render as recuperar_senha_app
 
 # ==========================================
 # IMPORTS INTERNOS

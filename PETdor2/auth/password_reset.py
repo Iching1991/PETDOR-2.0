@@ -1,147 +1,80 @@
-# PETdor2/auth/password_reset.py (atualizado)
+# PETdor2/pages/password_reset.py
 """
-Módulo de recuperação de senha - gerencia reset de senhas.
+Página de redefinição de senha usando token JWT.
+O usuário recebe um link com token e redefine a senha aqui.
 """
+import streamlit as st
 import logging
-from datetime import datetime, timedelta
-import os
-from .security import generate_reset_token, verify_reset_token, hash_password
-from utils.email_sender import enviar_email_recuperacao_senha
-from database.supabase_client import get_supabase
+from auth.password_reset import validar_token_reset, redefinir_senha_com_token
 
 logger = logging.getLogger(__name__)
 
-def solicitar_reset_senha(email):
-    """
-    Gera um token de redefinição de senha para o e-mail fornecido e envia um e-mail.
-    """
-    from database.supabase_client import get_supabase  # import local para evitar ciclo
-    try:
-        supabase = get_supabase()
+def render():
+    """Renderiza a página de redefinição de senha."""
+    st.header("🔐 Redefinir Senha")
 
-        # 1. Buscar usuário no Supabase
-        resp = supabase.table("usuarios").select("*").eq("email", email).execute()
-        if not resp.data:
-            # Retornamos mensagem genérica por segurança
-            logger.warning(f"Tentativa de reset de senha para e-mail não encontrado: {email}")
-            return True, "Se o e-mail estiver registrado, um link de redefinição de senha foi enviado."
+    # Obtém token da URL
+    query_params = st.query_params
+    token = query_params.get("token", [None])[0]
 
-        usuario = resp.data[0]
+    if not token:
+        st.warning("⚠️ Token de redefinição não fornecido.")
+        st.info("Verifique o link enviado para seu e-mail.")
+        return
 
-        # 2. Gerar token e data de expiração
-        token = generate_reset_token(email)
-        expires_at = datetime.now() + timedelta(hours=1)
+    # Valida token
+    with st.spinner("⏳ Validando token..."):
+        token_valido, msg, email = validar_token_reset(token)
 
-        # 3. Atualizar Supabase com token e expiração
-        update_resp = supabase.table("usuarios").update({
-            "reset_password_token": token,
-            "reset_password_expires": expires_at.isoformat()
-        }).eq("id", usuario["id"]).execute()
+    if not token_valido:
+        st.error(f"❌ {msg}")
+        st.info("Solicite um novo link na página de login.")
+        return
 
-        if not update_resp.data:
-            logger.error(f"Erro ao salvar token para {email}")
-            return False, "Erro interno ao processar solicitação."
+    st.success(f"✅ Token válido para **{email}**")
+    st.divider()
 
-        # 4. Enviar e-mail
-        try:
-            reset_link = f"{os.getenv('STREAMLIT_APP_URL')}?action=reset_password&token={token}"
-            email_enviado, msg_email = enviar_email_recuperacao_senha(
-                usuario["email"], 
-                usuario["nome"], 
-                reset_link
-            )
-            if email_enviado:
-                logger.info(f"E-mail de redefinição enviado para {email}.")
-            else:
-                logger.warning(f"Falha ao enviar e-mail de redefinição para {email}: {msg_email}")
+    # Formulário de redefinição
+    st.subheader("📝 Nova Senha")
 
-            return True, "Se o e-mail estiver registrado, um link de redefinição de senha foi enviado."
+    nova_senha = st.text_input(
+        "Nova senha",
+        type="password",
+        key="input_nova_senha",
+        help="Mínimo 8 caracteres"
+    )
 
-        except Exception as e:
-            logger.error(f"Erro ao enviar e-mail de redefinição para {email}: {e}", exc_info=True)
-            return True, "Link de redefinição gerado, mas houve problema ao enviar o e-mail."
+    confirmar_senha = st.text_input(
+        "Confirmar senha",
+        type="password",
+        key="input_confirmar_senha"
+    )
 
-    except Exception as e:
-        logger.error(f"Erro em solicitar_reset_senha: {e}", exc_info=True)
-        return False, "Erro interno ao processar solicitação."
+    if st.button("🔄 Redefinir Senha", key="btn_redefinir"):
+        # Validações
+        if not nova_senha or not confirmar_senha:
+            st.error("❌ Preencha todos os campos.")
+            return
 
-def validar_token_reset(token):
-    """
-    Verifica se um token de redefinição de senha é válido e não expirou.
-    Retorna (True, mensagem, email_usuario) ou (False, mensagem, None)
-    """
-    from database.supabase_client import get_supabase  # import local
-    try:
-        supabase = get_supabase()
-
-        # Valida token JWT
-        token_valido, resultado = verify_reset_token(token)
-
-        if not token_valido:
-            logger.warning(f"Tentativa de validação com token inválido")
-            return False, resultado, None  # resultado contém a mensagem de erro
-
-        email = resultado  # resultado contém o email
-
-        # Verifica se o token ainda está no banco de dados
-        resp = supabase.table("usuarios").select("*").eq("reset_password_token", token).execute()
-        if not resp.data:
-            logger.warning(f"Tentativa de validação com token não encontrado no banco")
-            return False, "Token de redefinição inválido ou já utilizado.", None
-
-        usuario = resp.data[0]
-        expires_at = usuario.get("reset_password_expires")
-
-        if not expires_at or datetime.fromisoformat(expires_at) < datetime.now():
-            logger.warning(f"Tentativa de validação com token expirado para {email}")
-            return False, "Token de redefinição expirado. Solicite um novo.", None
-
-        logger.info(f"Token de reset válido para {email}")
-        return True, "Token válido.", email
-
-    except Exception as e:
-        logger.error(f"Erro em validar_token_reset: {e}", exc_info=True)
-        return False, "Erro ao validar token.", None
-
-def redefinir_senha_com_token(token, nova_senha):
-    """
-    Redefine a senha de um usuário usando um token válido.
-    """
-    from database.supabase_client import get_supabase  # import local
-    try:
-        # 1. Validar token
-        token_valido, msg, email_usuario = validar_token_reset(token)
-        if not token_valido:
-            return False, msg
-
-        # 2. Validar força da senha
         if len(nova_senha) < 8:
-            return False, "Senha deve ter pelo menos 8 caracteres."
+            st.error("❌ Senha deve ter pelo menos 8 caracteres.")
+            return
 
-        # 3. Criar hash da nova senha
-        senha_hash = hash_password(nova_senha)
+        if nova_senha != confirmar_senha:
+            st.error("❌ As senhas não correspondem.")
+            return
 
-        # 4. Atualizar Supabase: nova senha e invalidar token
-        supabase = get_supabase()
-        update_resp = supabase.table("usuarios").update({
-            "senha_hash": senha_hash,
-            "reset_password_token": None,
-            "reset_password_expires": None
-        }).eq("email", email_usuario).execute()
+        # Redefine senha
+        with st.spinner("⏳ Redefinindo senha..."):
+            sucesso, mensagem = redefinir_senha_com_token(token, nova_senha)
 
-        if not update_resp.data:
-            logger.error(f"Erro ao redefinir senha para {email_usuario}")
-            return False, "Erro interno ao redefinir senha."
+        if sucesso:
+            st.success(mensagem)
+            st.info("🔐 Você já pode fazer login com sua nova senha!")
+            if st.button("🔐 Ir para Login"):
+                st.session_state.pagina = "login"
+                st.rerun()
+        else:
+            st.error(f"❌ {mensagem}")
 
-        logger.info(f"Senha redefinida com sucesso para {email_usuario}")
-        return True, "Senha redefinida com sucesso. Você já pode fazer login."
-
-    except Exception as e:
-        logger.error(f"Erro em redefinir_senha_com_token: {e}", exc_info=True)
-        return False, "Erro interno ao redefinir senha."
-
-__all__ = [
-    "solicitar_reset_senha",
-    "validar_token_reset",
-    "redefinir_senha_com_token",
-]
+__all__ = ["render"]

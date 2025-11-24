@@ -1,174 +1,138 @@
-# PETdor2/streamlit_app.py
-
-import sys
 import os
+import sys
 import streamlit as st
 
-# --- Corrige importações para Streamlit Cloud ---
-current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.abspath(os.path.join(current_dir, "."))
-if root_dir not in sys.path:
-    sys.path.insert(0, root_dir)
-# --- Fim correção ---
+# ==========================================================
+# CORREÇÃO DE PATH PARA FUNCIONAR NO STREAMLIT CLOUD
+# ==========================================================
 
-# ===========================
-# Importações do banco e auth
-# ===========================
-from database.migration import migrar_banco_completo
-from auth.user import cadastrar_usuario, verificar_credenciais, confirmar_email
-from auth.password_reset import solicitar_reset_senha, validar_token_reset, redefinir_senha_com_token
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))          # /PETdor2
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))   # /mount/src/petdor2
 
-# ===========================
-# Importações das páginas
-# ===========================
-from pages.cadastro_pet import render as cadastro_pet_app
+# Adiciona o diretório atual (PETdor2/)
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+# Adiciona o diretório raiz do projeto
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+
+# ==========================================================
+# IMPORTAÇÕES DOS MÓDULOS INTERNOS
+# ==========================================================
+
+from pages.login import render as login_app
+from pages.cadastro import render as cadastro_app
 from pages.avaliacao import render as avaliacao_app
-from pages.home import render as home_app
-from pages.perfil import render as perfil_app
+from pages.cadastro_pet import render as cadastro_pet_app
+from pages.historico import render as historico_app
+from pages.admin import render as admin_app
+from pages.conta import render as conta_app
+from pages.confirmar_email import render as confirmar_email_app
+from pages.password_reset import render as password_reset_app
+from pages.recuperar_senha import render as recuperar_senha_app
 
-# ===========================
-# Inicializa banco
-# ===========================
-migrar_banco_completo()
+from utils.notifications import verificar_confirmacao_email
+from auth.security import usuario_logado, logout
 
-# ===========================
-# Configurações da página
-# ===========================
-st.set_page_config(page_title="PETDOR – Sistema PETDOR", layout="centered")
-st.title("🐾 PETDOR – Sistema PETDOR")
 
-# ===========================
-# Lógica de URL parameters (confirmar e-mail / reset password)
-# ===========================
-query_params = st.query_params
-if "token" in query_params and "action" in query_params:
-    token = query_params["token"]
-    action = query_params["action"][0] if isinstance(query_params["action"], list) else query_params["action"]
+# ==========================================================
+# CONFIGURAÇÃO BASE DO STREAMLIT
+# ==========================================================
 
-    if action == "confirm_email":
-        st.subheader("Confirmação de E-mail")
-        ok, msg = confirmar_email(token)
-        st.success(msg) if ok else st.error(msg)
-        st.experimental_set_query_params()  # limpa query params
-        st.stop()
+st.set_page_config(
+    page_title="PetDor - Avaliação de Dor Animal",
+    page_icon="🐾",
+    layout="wide",
+)
 
-    elif action == "reset_password":
-        st.subheader("Redefinir Senha")
-        st.info("Insira sua nova senha.")
-        nova_senha = st.text_input("Nova Senha", type="password", key="reset_nova_senha_url")
-        confirmar_nova_senha = st.text_input("Confirmar Nova Senha", type="password", key="reset_confirmar_nova_senha_url")
-        if st.button("Redefinir Senha", key="btn_redefinir_url"):
-            if not nova_senha or not confirmar_nova_senha:
-                st.error("Preencha ambos os campos de senha.")
-            elif nova_senha != confirmar_nova_senha:
-                st.error("As senhas não coincidem.")
-            else:
-                ok, msg = redefinir_senha_com_token(token, nova_senha)
-                st.success(msg) if ok else st.error(msg)
-                st.experimental_set_query_params()
-                st.stop()
-        st.stop()
 
-# ===========================
-# Menu lateral principal (login / criar conta / reset)
-# ===========================
-menu = st.sidebar.selectbox("Menu", ["Login", "Criar Conta", "Redefinir Senha"])
+# ==========================================================
+# SISTEMA DE NAVEGAÇÃO
+# ==========================================================
 
-# ---------------------------
-# LOGIN
-# ---------------------------
-if menu == "Login":
-    st.subheader("Login")
-    email = st.text_input("E-mail", key="login_email").lower()
-    senha = st.text_input("Senha", type="password", key="login_senha")
-    if st.button("Entrar", key="btn_login"):
-        ok, result = verificar_credenciais(email, senha)
-        if ok:
-            st.success("Login bem-sucedido!")
-            st.session_state.update({
-                "usuario": result,
-                "logged_in": True,
-                "page": "Home"
-            })
-            st.rerun()
-        else:
-            st.error(result)
+def navegar():
+    """Controla as páginas com base no estado da sessão."""
+    if "pagina" not in st.session_state:
+        st.session_state.pagina = "login"
 
-# ---------------------------
-# CRIAR CONTA
-# ---------------------------
-elif menu == "Criar Conta":
-    st.subheader("Criar Nova Conta")
-    with st.form("cadastro_form"):
-        nome = st.text_input("Nome Completo").title()
-        email = st.text_input("E-mail").lower()
-        senha = st.text_input("Senha", type="password")
-        confirmar_senha = st.text_input("Confirmar Senha", type="password")
-        tipo_usuario = st.selectbox("Tipo de Usuário", ["Tutor", "Veterinário", "Clínica"])
-        pais = st.text_input("País", value="Brasil").title()
-        submitted = st.form_submit_button("Cadastrar")
-        if submitted:
-            if not nome or not email or not senha or not confirmar_senha:
-                st.error("Preencha todos os campos.")
-            elif senha != confirmar_senha:
-                st.error("As senhas não coincidem.")
-            else:
-                ok, msg = cadastrar_usuario(nome, email, senha, tipo_usuario, pais)
-                st.success(msg) if ok else st.error(msg)
-                if ok:
-                    st.info("Confirme seu e-mail antes de fazer login.")
+    pagina = st.session_state.pagina
 
-# ---------------------------
-# REDEFINIR SENHA
-# ---------------------------
-elif menu == "Redefinir Senha":
-    st.subheader("Redefinir Senha")
-    email_reset = st.text_input("Seu e-mail").lower()
-    if st.button("Enviar link de redefinição"):
-        ok, msg = solicitar_reset_senha(email_reset)
-        st.info(msg) if ok else st.error(msg)
-
-    st.markdown("---")
-    st.write("Ou, se você já tem um token e não está usando o link do e-mail:")
-    token_input = st.text_input("Token")
-    nova_senha = st.text_input("Nova senha", type="password")
-    confirmar_nova_senha_manual = st.text_input("Confirmar nova senha", type="password")
-    if st.button("Alterar senha manualmente"):
-        if not token_input or not nova_senha or not confirmar_nova_senha_manual:
-            st.error("Preencha o token e a nova senha.")
-        elif nova_senha != confirmar_nova_senha_manual:
-            st.error("As senhas não coincidem.")
-        else:
-            valido, msg_val, email_usuario = validar_token_reset(token_input)
-            if valido and email_usuario:
-                ok, msg = redefinir_senha_com_token(token_input, nova_senha)
-                st.success(msg) if ok else st.error(msg)
-            else:
-                st.error(msg_val)
-
-# ===========================
-# Páginas do sistema (após login)
-# ===========================
-if st.session_state.get("logged_in"):
-    st.sidebar.markdown("---")
-    st.sidebar.title("Navegação")
-
-    paginas = {
-        "Home": home_app,
-        "Cadastro de Pet": cadastro_pet_app,
-        "Avaliação de Dor": avaliacao_app,
-        "Perfil": perfil_app
+    # Rotas
+    rotas = {
+        "login": login_app,
+        "cadastro": cadastro_app,
+        "avaliacao": avaliacao_app,
+        "cadastro_pet": cadastro_pet_app,
+        "historico": historico_app,
+        "admin": admin_app,
+        "conta": conta_app,
+        "confirmar_email": confirmar_email_app,
+        "password_reset": password_reset_app,
+        "recuperar_senha": recuperar_senha_app,
     }
 
-    selected_page = st.sidebar.selectbox(
-        "Selecionar Página",
-        list(paginas.keys()),
-        index=list(paginas.keys()).index(st.session_state.get("page", "Home"))
-    )
+    if pagina in rotas:
+        rotas[pagina]()
+    else:
+        st.error(f"Página '{pagina}' não encontrada.")
 
-    st.session_state["page"] = selected_page
-    paginas[selected_page]()
 
-    if st.sidebar.button("Sair"):
-        st.session_state.clear()
-        st.rerun()
+# ==========================================================
+# LAYOUT DA INTERFACE
+# ==========================================================
+
+def menu_lateral():
+    """Cria o menu lateral após login."""
+    with st.sidebar:
+        st.title("🐾 PetDor")
+
+        user = usuario_logado()
+
+        if user:
+            st.write(f"👋 Bem-vindo(a), **{user['email']}**")
+
+            if st.button("🏠 Página Inicial"):
+                st.session_state.pagina = "avaliacao"
+
+            if st.button("🐶 Cadastrar Pet"):
+                st.session_state.pagina = "cadastro_pet"
+
+            if st.button("📜 Histórico"):
+                st.session_state.pagina = "historico"
+
+            if user.get("is_admin"):
+                st.divider()
+                if st.button("🛠 Área Administrativa"):
+                    st.session_state.pagina = "admin"
+
+            st.divider()
+
+            if st.button("⚙ Minha Conta"):
+                st.session_state.pagina = "conta"
+
+            if st.button("🚪 Sair"):
+                logout()
+                st.session_state.pagina = "login"
+                st.rerun()
+        else:
+            st.info("Faça login para acessar todas as funcionalidades.")
+
+
+# ==========================================================
+# APLICAÇÃO PRINCIPAL
+# ==========================================================
+
+def main():
+    user = usuario_logado()
+
+    if user:
+        verificar_confirmacao_email(user)
+
+    menu_lateral()
+    navegar()
+
+
+if __name__ == "__main__":
+    main()

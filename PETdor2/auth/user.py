@@ -1,6 +1,6 @@
 # PETdor2/auth/user.py
 """
-Módulo de usuário - autenticação e gerenciamento de contas.
+Módulo de usuários - autenticação e gerenciamento de contas.
 """
 import logging
 from datetime import datetime
@@ -9,64 +9,60 @@ from database.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
 
-def verificar_credenciais(email: str, senha: str) -> tuple[bool, str | dict]:
-    """Verifica as credenciais do usuário."""
+def verificar_credenciais(email: str, senha: str) -> tuple[bool, dict]:
+    """Verifica credenciais do usuário."""
     try:
-        supabase = get_supabase()  # ← Chama aqui, não no import
+        supabase = get_supabase()
 
         response = (
             supabase
             .from_("usuarios")
             .select("*")
             .eq("email", email)
+            .single()
             .execute()
         )
 
-        usuarios = getattr(response, "data", None) or (response.get("data") if isinstance(response, dict) else None)
+        usuario = response.data
+        if not usuario:
+            return False, {"erro": "Usuário não encontrado"}
 
-        if not usuarios or len(usuarios) == 0:
-            return False, "❌ E-mail ou senha incorretos."
+        if not verify_password(senha, usuario.get("senha_hash", "")):
+            return False, {"erro": "Senha incorreta"}
 
-        usuario = usuarios[0]
-
-        if not verify_password(senha, usuario["senha_hash"]):
-            return False, "❌ E-mail ou senha incorretos."
-
-        if not usuario.get("email_confirmado", False):
-            return False, "⚠️ Por favor, confirme seu e-mail antes de fazer login."
-
-        logger.info(f"✅ Usuário {email} logado com sucesso")
+        logger.info(f"✅ Login bem-sucedido para {email}")
         return True, usuario
 
     except Exception as e:
         logger.error(f"Erro ao verificar credenciais: {e}")
-        return False, f"❌ Erro ao fazer login: {e}"
+        return False, {"erro": str(e)}
 
-def buscar_usuario_por_email(email: str) -> dict | None:
+def buscar_usuario_por_email(email: str) -> dict:
     """Busca um usuário pelo e-mail."""
     try:
-        supabase = get_supabase()  # ← Chama aqui, não no import
+        supabase = get_supabase()
 
         response = (
             supabase
             .from_("usuarios")
             .select("*")
             .eq("email", email)
+            .single()
             .execute()
         )
 
-        usuarios = getattr(response, "data", None) or (response.get("data") if isinstance(response, dict) else None)
-        return usuarios[0] if usuarios else None
+        return response.data if response.data else None
 
     except Exception as e:
-        logger.error(f"Erro ao buscar usuário: {e}")
+        logger.warning(f"Usuário não encontrado: {email}")
         return None
 
 def cadastrar_usuario(nome: str, email: str, senha: str, tipo_usuario: str = "tutor") -> tuple[bool, str]:
     """Cadastra um novo usuário."""
     try:
-        supabase = get_supabase()  # ← Chama aqui, não no import
+        supabase = get_supabase()
 
+        # Verifica se já existe
         usuario_existente = buscar_usuario_por_email(email)
         if usuario_existente:
             return False, "❌ Este e-mail já está cadastrado."
@@ -79,6 +75,7 @@ def cadastrar_usuario(nome: str, email: str, senha: str, tipo_usuario: str = "tu
             "senha_hash": senha_hash,
             "tipo_usuario": tipo_usuario,
             "email_confirmado": False,
+            "ativo": True,
             "criado_em": datetime.utcnow().isoformat()
         }
 
@@ -90,5 +87,37 @@ def cadastrar_usuario(nome: str, email: str, senha: str, tipo_usuario: str = "tu
         logger.error(f"Erro ao cadastrar usuário: {e}")
         return False, f"❌ Erro ao cadastrar: {e}"
 
-__all__ = ["verificar_credenciais", "buscar_usuario_por_email", "cadastrar_usuario"]
+def atualizar_tipo_usuario(usuario_id: int, novo_tipo: str) -> bool:
+    """Atualiza o tipo de um usuário."""
+    try:
+        supabase = get_supabase()
 
+        supabase.from_("usuarios").update({"tipo_usuario": novo_tipo}).eq("id", usuario_id).execute()
+        logger.info(f"✅ Tipo do usuário {usuario_id} atualizado para {novo_tipo}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro ao atualizar tipo: {e}")
+        return False
+
+def atualizar_status_usuario(usuario_id: int, ativo: bool) -> bool:
+    """Ativa ou desativa um usuário."""
+    try:
+        supabase = get_supabase()
+
+        supabase.from_("usuarios").update({"ativo": ativo}).eq("id", usuario_id).execute()
+        status = "ativado" if ativo else "desativado"
+        logger.info(f"✅ Usuário {usuario_id} {status}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro ao atualizar status: {e}")
+        return False
+
+__all__ = [
+    "verificar_credenciais",
+    "buscar_usuario_por_email",
+    "cadastrar_usuario",
+    "atualizar_tipo_usuario",
+    "atualizar_status_usuario",
+]

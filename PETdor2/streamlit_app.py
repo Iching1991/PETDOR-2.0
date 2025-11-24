@@ -1,22 +1,26 @@
+# PETdor2/streamlit_app.py
+
 import sys
 import os
 import streamlit as st
 
 # ==========================================================
-# CONFIGURAÇÃO DO PATH — garante que PETdor2 é reconhecido
+# CONFIGURAÇÃO DO PATH PARA IMPORTS LOCAIS
 # ==========================================================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # .../PETdor2
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))  # raiz do projeto
 
-# adiciona ao sys.path para que "pages" seja encontrado
+# Caminho do diretório onde este arquivo está
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # .../PETdor2
+# Diretório raiz do projeto
+PROJECT_ROOT = BASE_DIR
+
+# Garante que o diretório PETdor2 esteja no sys.path
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
 
 # ==========================================================
-# IMPORTAÇÃO DAS PÁGINAS DO SISTEMA
+# IMPORTAÇÃO DAS PÁGINAS
 # ==========================================================
+
 from pages.login import render as login_app
 from pages.cadastro import render as cadastro_app
 from pages.avaliacao import render as avaliacao_app
@@ -31,12 +35,14 @@ from pages.recuperar_senha import render as recuperar_senha_app
 # ==========================================================
 # IMPORTS INTERNOS
 # ==========================================================
+
 from utils.notifications import verificar_confirmacao_email
 from auth.security import usuario_logado, logout
 
 # ==========================================================
-# CONFIGURAÇÃO DO STREAMLIT
+# CONFIGURAÇÃO BASE DO STREAMLIT
 # ==========================================================
+
 st.set_page_config(
     page_title="PetDor - Avaliação de Dor Animal",
     page_icon="🐾",
@@ -44,9 +50,11 @@ st.set_page_config(
 )
 
 # ==========================================================
-# SISTEMA DE NAVEGAÇÃO ENTRE PÁGINAS
+# SISTEMA DE NAVEGAÇÃO
 # ==========================================================
+
 def navegar():
+    """Controla qual página deve ser exibida."""
     if "pagina" not in st.session_state:
         st.session_state.pagina = "login"
 
@@ -71,8 +79,9 @@ def navegar():
         st.error(f"Página '{pagina}' não encontrada.")
 
 # ==========================================================
-# MENU LATERAL (APÓS LOGIN)
+# MENU LATERAL
 # ==========================================================
+
 def menu_lateral():
     with st.sidebar:
         st.title("🐾 PetDor")
@@ -105,13 +114,13 @@ def menu_lateral():
                 logout()
                 st.session_state.pagina = "login"
                 st.rerun()
-
         else:
             st.info("Faça login para acessar todas as funcionalidades.")
 
 # ==========================================================
-# APLICAÇÃO PRINCIPAL
+# FUNÇÃO PRINCIPAL
 # ==========================================================
+
 def main():
     user = usuario_logado()
     if user:

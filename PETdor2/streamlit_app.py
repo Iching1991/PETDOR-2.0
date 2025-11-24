@@ -1,64 +1,51 @@
 import sys
 import os
+import streamlit as st
 
-# Diretório do streamlit_app.py
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # .../PETdor2
-# Diretório raiz do projeto (onde PETdor2 está)
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
+# ==========================================================
+# CONFIGURAÇÃO DO PATH — garante que PETdor2 é reconhecido
+# ==========================================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # PETdor2/
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))  # raiz do projeto
 
-# Adiciona raiz do projeto ao sys.path
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
-# ==========================================
-# CORREÇÃO DE PATH — FUNCIONA NO STREAMLIT CLOUD
-# ==========================================
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))          # /PETdor2
-PROJECT_ROOT = BASE_DIR                                        # raiz do projeto
-
-# Garante que PETdor2/ está no sys.path
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
-# ==========================================
+# ==========================================================
 # IMPORTAÇÃO DAS PÁGINAS DO SISTEMA
-# ==========================================
-
+# ==========================================================
 from pages.login import render as login_app
 from pages.cadastro import render as cadastro_app
-from PETdor2.pages.avaliacao import render as avaliacao_app
-from PETdor2.pages.cadastro_pet import render as cadastro_pet_app
-from PETdor2.pages.login import render as login_app
-from PETdor2.pages.admin import render as admin_app
-from PETdor2.pages.conta import render as conta_app
-from PETdor2.pages.confirmar_email import render as confirmar_email_app
-from PETdor2.pages.password_reset import render as password_reset_app
-from PETdor2.pages.recuperar_senha import render as recuperar_senha_app
+from pages.avaliacao import render as avaliacao_app
+from pages.cadastro_pet import render as cadastro_pet_app
+from pages.historico import render as historico_app
+from pages.admin import render as admin_app
+from pages.conta import render as conta_app
+from pages.confirmar_email import render as confirmar_email_app
+from pages.password_reset import render as password_reset_app
+from pages.recuperar_senha import render as recuperar_senha_app
 
-# ==========================================
+# ==========================================================
 # IMPORTS INTERNOS
-# ==========================================
-
+# ==========================================================
 from utils.notifications import verificar_confirmacao_email
 from auth.security import usuario_logado, logout
 
-# ==========================================
+# ==========================================================
 # CONFIGURAÇÃO DO STREAMLIT
-# ==========================================
-
+# ==========================================================
 st.set_page_config(
     page_title="PetDor - Avaliação de Dor Animal",
     page_icon="🐾",
     layout="wide",
 )
 
-# ==========================================
+# ==========================================================
 # SISTEMA DE NAVEGAÇÃO ENTRE PÁGINAS
-# ==========================================
-
+# ==========================================================
 def navegar():
-    """Controla qual página deve ser exibida."""
     if "pagina" not in st.session_state:
         st.session_state.pagina = "login"
 
@@ -82,10 +69,9 @@ def navegar():
     else:
         st.error(f"Página '{pagina}' não encontrada.")
 
-# ==========================================
+# ==========================================================
 # MENU LATERAL (APÓS LOGIN)
-# ==========================================
-
+# ==========================================================
 def menu_lateral():
     with st.sidebar:
         st.title("🐾 PetDor")
@@ -122,13 +108,11 @@ def menu_lateral():
         else:
             st.info("Faça login para acessar todas as funcionalidades.")
 
-# ==========================================
+# ==========================================================
 # APLICAÇÃO PRINCIPAL
-# ==========================================
-
+# ==========================================================
 def main():
     user = usuario_logado()
-
     if user:
         verificar_confirmacao_email(user)
 
@@ -137,4 +121,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

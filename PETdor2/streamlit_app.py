@@ -2,31 +2,25 @@ import sys
 import os
 import streamlit as st
 
-# === Corrige path raiz para permitir imports como "from pages..." ===
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))      # .../PETdor2
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))  # .../mount/src/petdor2/
-
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
 # ==========================================================
-# CORREÇÃO DE PATH PARA FUNCIONAR NO STREAMLIT CLOUD
+# AJUSTE DE PATH (CORRETO E ÚNICO)
 # ==========================================================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))          # /PETdor2
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))   # /mount/src/petdor2
+# Caminho do arquivo atual: .../PETdor2/streamlit_app.py
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))           # /PETdor2
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))    # /mount/src/petdor2
 
-# Adiciona o diretório atual (PETdor2/)
+# Garante que o diretório do app esteja no sys.path
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-# Adiciona o diretório raiz do projeto
+# Garante que o diretório raiz também esteja no sys.path
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 
 # ==========================================================
-# IMPORTAÇÕES DOS MÓDULOS INTERNOS
+# IMPORTAÇÕES INTERNAS
 # ==========================================================
 
 from pages.login import render as login_app
@@ -45,7 +39,7 @@ from auth.security import usuario_logado, logout
 
 
 # ==========================================================
-# CONFIGURAÇÃO BASE DO STREAMLIT
+# CONFIGURAÇÃO DO STREAMLIT
 # ==========================================================
 
 st.set_page_config(
@@ -60,13 +54,11 @@ st.set_page_config(
 # ==========================================================
 
 def navegar():
-    """Controla as páginas com base no estado da sessão."""
     if "pagina" not in st.session_state:
         st.session_state.pagina = "login"
 
     pagina = st.session_state.pagina
 
-    # Rotas
     rotas = {
         "login": login_app,
         "cadastro": cadastro_app,
@@ -87,11 +79,10 @@ def navegar():
 
 
 # ==========================================================
-# LAYOUT DA INTERFACE
+# MENU LATERAL
 # ==========================================================
 
 def menu_lateral():
-    """Cria o menu lateral após login."""
     with st.sidebar:
         st.title("🐾 PetDor")
 

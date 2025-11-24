@@ -1,7 +1,7 @@
 # PETdor2/pages/cadastro.py
 
 import streamlit as st
-from PETdor2.auth.user import cadastrar_usuario
+from auth.user import cadastrar_usuario
 
 
 def render():
@@ -35,6 +35,7 @@ def render():
             st.success(msg)
             st.info("Verifique seu e-mail para confirmar sua conta.")
             st.session_state.pagina = "login"
+            st.rerun()
         else:
             st.error(msg)
 

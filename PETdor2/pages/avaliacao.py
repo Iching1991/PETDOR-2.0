@@ -7,7 +7,7 @@ import json
 # ===============================================
 # IMPORTS SUPABASE
 # ===============================================
-from ..database.supabase_client import supabase
+from database.supabase_client import supabase
 from PETdor2.especies.index import (
     get_especies_nomes,
     buscar_especie_por_id,
@@ -133,4 +133,5 @@ def render():
             pontuacao_total
         )
         st.success("Avaliação salva com sucesso! ✅")
+
 

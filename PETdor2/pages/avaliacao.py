@@ -5,10 +5,9 @@ from datetime import datetime
 import json
 
 # ===============================================
-# IMPORTS ABSOLUTOS — compatíveis com Streamlit Cloud
+# IMPORTS SUPABASE
 # ===============================================
-from PETdor2.database.connection import conectar_db
-from PETdor2.database.models import Pet
+from PETdor2.database.supabase_client import supabase
 from PETdor2.especies.index import (
     get_especies_nomes,
     buscar_especie_por_id,
@@ -17,45 +16,34 @@ from PETdor2.especies.index import (
 
 
 # ===============================================
-# Acesso ao Banco de Dados
+# Acesso ao Banco de Dados - SUPABASE
 # ===============================================
 def carregar_pets_do_usuario(usuario_id: int) -> list[dict]:
-    """Retorna todos os pets cadastrados pelo usuário."""
-    conn = conectar_db()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT id, nome, especie
-        FROM pets
-        WHERE tutor_id = ?
-        ORDER BY nome
-    """, (usuario_id,))
-    pets = cur.fetchall()
-    conn.close()
-    return pets
+    """Retorna todos os pets cadastrados pelo usuário via Supabase."""
+    response = (
+        supabase
+        .from_("pets")
+        .select("id, nome, especie")
+        .eq("tutor_id", usuario_id)
+        .order("nome", desc=False)
+        .execute()
+    )
+    return response.data or []
 
 
 def salvar_avaliacao(pet_id: int, usuario_id: int, especie: str, respostas_json: str, pontuacao_total: int):
-    """Salva a avaliação na tabela `avaliacoes`."""
-    conn = conectar_db()
-    cur = conn.cursor()
+    """Salva a avaliação na tabela `avaliacoes` usando Supabase."""
 
-    cur.execute("""
-        INSERT INTO avaliacoes (
-            pet_id, usuario_id, especie,
-            respostas_json, pontuacao_total, criado_em
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        pet_id,
-        usuario_id,
-        especie,
-        respostas_json,
-        pontuacao_total,
-        datetime.now()
-    ))
+    payload = {
+        "pet_id": pet_id,
+        "usuario_id": usuario_id,
+        "especie": especie,
+        "respostas_json": respostas_json,
+        "pontuacao_total": pontuacao_total,
+        "criado_em": datetime.now().isoformat()
+    }
 
-    conn.commit()
-    conn.close()
+    supabase.table("avaliacoes").insert(payload).execute()
 
 
 # ===============================================

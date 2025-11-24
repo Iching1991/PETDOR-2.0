@@ -1,37 +1,34 @@
 # PETdor2/pages/avaliacao.py
 
-import sys
 import os
+import sys
+import json
 import streamlit as st
 from datetime import datetime
-import json
-
 
 # ============================================
-# Correção de caminho para Streamlit Cloud
+# Garantir que PETdor2/ esteja no sys.path
 # ============================================
 current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.abspath(os.path.join(current_dir, ".."))  # raiz: PETdor2/
+root_dir = os.path.abspath(os.path.join(current_dir, ".."))  # PETdor2/
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
-
 # ============================================
-# Importações locais ajustadas (uso do ..)
+# IMPORTS ABSOLUTOS – OBRIGATÓRIOS NO CLOUD
 # ============================================
-from ..database.connection import conectar_db
-from ..database.models import Pet
-from ..especies.index import (
+from PETdor2.database.connection import conectar_db
+from PETdor2.database.models import Pet
+from PETdor2.especies.index import (
     get_especies_nomes,
     buscar_especie_por_id,
     get_escala_labels
 )
 
-
 # ==========================================================
 # Funções de acesso ao banco
 # ==========================================================
-def carregar_pets_do_usuario(usuario_id: int) -> list[dict]:
+def carregar_pets_do_usuario(usuario_id: int):
     """Retorna todos os pets cadastrados pelo usuário."""
     conn = conectar_db()
     cur = conn.cursor()

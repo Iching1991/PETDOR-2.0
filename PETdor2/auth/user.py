@@ -101,6 +101,58 @@ def cadastrar_usuario(nome: str, email: str, senha: str, tipo: str = "tutor", pa
         logger.error(f"Erro ao cadastrar usuário: {e}", exc_info=True)
         return False, f"❌ Erro ao cadastrar: {str(e)}"
 
+def redefinir_senha(usuario_id: int, senha_atual: str, nova_senha: str) -> tuple[bool, str]:
+    """
+    Redefine a senha do usuário após validação da senha atual.
+
+    Args:
+        usuario_id: ID do usuário
+        senha_atual: Senha atual do usuário
+        nova_senha: Nova senha desejada
+
+    Returns:
+        (True, mensagem) se sucesso, (False, mensagem_erro) caso contrário
+    """
+    try:
+        supabase = get_supabase()
+
+        # Busca o usuário
+        response = (
+            supabase
+            .from_("usuarios")
+            .select("senha_hash")
+            .eq("id", usuario_id)
+            .single()
+            .execute()
+        )
+
+        usuario = response.data
+        if not usuario:
+            return False, "❌ Usuário não encontrado."
+
+        # Verifica se a senha atual está correta
+        if not verify_password(senha_atual, usuario.get("senha_hash", "")):
+            return False, "❌ Senha atual incorreta."
+
+        # Validações
+        if len(nova_senha) < 8:
+            return False, "❌ A nova senha deve ter pelo menos 8 caracteres."
+
+        # Hash da nova senha
+        nova_senha_hash = hash_password(nova_senha)
+
+        # Atualiza a senha
+        supabase.from_("usuarios").update({
+            "senha_hash": nova_senha_hash
+        }).eq("id", usuario_id).execute()
+
+        logger.info(f"✅ Senha do usuário {usuario_id} alterada com sucesso")
+        return True, "✅ Senha alterada com sucesso!"
+
+    except Exception as e:
+        logger.error(f"Erro ao redefinir senha: {e}")
+        return False, f"❌ Erro ao redefinir senha: {str(e)}"
+
 def atualizar_tipo_usuario(usuario_id: int, novo_tipo: str) -> bool:
     """Atualiza o tipo de um usuário."""
     try:
@@ -128,6 +180,7 @@ __all__ = [
     "verificar_credenciais",
     "buscar_usuario_por_email",
     "cadastrar_usuario",
+    "redefinir_senha",
     "atualizar_tipo_usuario",
     "atualizar_status_usuario",
 ]

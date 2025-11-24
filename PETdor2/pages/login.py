@@ -1,7 +1,5 @@
-# PETdor2/pages/login.py
 import streamlit as st
-from PETdor2.auth.user import verificar_credenciais, buscar_usuario_por_email
-
+from auth.user import verificar_credenciais, buscar_usuario_por_email
 
 def render():
     st.header("🔐 Login")
@@ -13,7 +11,7 @@ def render():
         if st.button("Sair"):
             st.session_state.usuario = None
             st.session_state.pagina = "login"
-            st.experimental_rerun()
+            st.rerun()
         return
 
     # Formulário de login
@@ -22,15 +20,14 @@ def render():
 
     if st.button("Entrar"):
         ok, resultado = verificar_credenciais(email, senha)
-
         if not ok:
             st.error(resultado)
         else:
             # Usuário autenticado com sucesso
             st.session_state.usuario = resultado
             st.success("Login realizado com sucesso!")
-            st.session_state.pagina = "inicio"
-            st.experimental_rerun()
+            st.session_state.pagina = "avaliacao"  # Redireciona para avaliação
+            st.rerun()
 
     st.markdown("---")
 
@@ -39,11 +36,11 @@ def render():
     with col1:
         if st.button("Criar conta"):
             st.session_state.pagina = "cadastro"
-            st.experimental_rerun()
+            st.rerun()
     with col2:
         if st.button("Esqueci minha senha"):
             st.session_state.pagina = "recuperar_senha"
-            st.experimental_rerun()
+            st.rerun()
 
     st.markdown("""
         <br>

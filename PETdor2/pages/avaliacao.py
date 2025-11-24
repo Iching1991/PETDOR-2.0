@@ -15,8 +15,13 @@ from PETdor2.especies import (
     get_escala_labels,
 )
 
-# Importa Supabase (agora import correto e final!)
+# Substitua qualquer import relativo
+# de:
+# from ..database.supabase_client import supabase
+# para:
 from PETdor2.database.supabase_client import supabase
+from PETdor2.especies.index import get_especies_nomes, buscar_especie_por_id, get_escala_labels
+
 
 
 # =====================================================================
@@ -92,3 +97,4 @@ def render():
     for pergunta in especie_config["perguntas"]:
         respostas[pergunta] = st.selectbox(
             p
+

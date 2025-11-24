@@ -7,7 +7,7 @@ import json
 # ===============================================
 # IMPORTS (compatíveis com streamlit_app.py que adiciona PETdor2/ ao sys.path)
 # ===============================================
-from ..database.supabase_client import supabase
+from database.supabase_client import supabase
 from especies.index import (
     get_especies_nomes,
     buscar_especie_por_id,
@@ -148,5 +148,6 @@ def render():
             st.success("Avaliação salva com sucesso! ✅")
         except Exception as e:
             st.error(f"Erro ao salvar avaliação: {e}")
+
 
 

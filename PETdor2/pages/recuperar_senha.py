@@ -24,15 +24,18 @@ def render():
             st.error("❌ Por favor, digite seu e-mail.")
             return
 
-        with st.spinner("⏳ Processando solicitação..."):
-            sucesso, mensagem = solicitar_reset_senha(email)
+        try:
+            with st.spinner("⏳ Processando solicitação..."):
+                sucesso, mensagem = solicitar_reset_senha(email)
 
-        if sucesso:
-            st.success("✅ " + mensagem)
-            st.info(
-                "Verifique sua caixa de entrada e o spam."
-            )
-        else:
-            st.error("⚠ Ocorreu um erro ao processar a solicitação. Tente novamente.")
+            if sucesso:
+                st.success("✅ " + mensagem)
+                st.info("Verifique sua caixa de entrada e o spam.")
+            else:
+                st.error("⚠ Ocorreu um erro ao processar a solicitação. Tente novamente.")
+
+        except Exception as e:
+            logger.error(f"Erro em recuperar_senha: {e}", exc_info=True)
+            st.error("⚠ Erro interno ao processar solicitação. Tente novamente mais tarde.")
 
 __all__ = ["render"]

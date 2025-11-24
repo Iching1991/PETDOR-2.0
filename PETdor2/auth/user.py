@@ -3,20 +3,17 @@
 Módulo de usuário - autenticação e gerenciamento de contas.
 """
 import logging
+from datetime import datetime
 from .security import hash_password, verify_password
-from database.supabase_client import supabase
+from database.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
 
 def verificar_credenciais(email: str, senha: str) -> tuple[bool, str | dict]:
-    """
-    Verifica as credenciais do usuário.
-
-    Returns:
-        (sucesso, resultado) onde resultado é mensagem de erro ou dados do usuário
-    """
+    """Verifica as credenciais do usuário."""
     try:
-        # Busca o usuário no Supabase
+        supabase = get_supabase()  # ← Chama aqui, não no import
+
         response = (
             supabase
             .from_("usuarios")
@@ -32,11 +29,9 @@ def verificar_credenciais(email: str, senha: str) -> tuple[bool, str | dict]:
 
         usuario = usuarios[0]
 
-        # Verifica a senha
         if not verify_password(senha, usuario["senha_hash"]):
             return False, "❌ E-mail ou senha incorretos."
 
-        # Verifica se o e-mail está confirmado
         if not usuario.get("email_confirmado", False):
             return False, "⚠️ Por favor, confirme seu e-mail antes de fazer login."
 
@@ -50,6 +45,8 @@ def verificar_credenciais(email: str, senha: str) -> tuple[bool, str | dict]:
 def buscar_usuario_por_email(email: str) -> dict | None:
     """Busca um usuário pelo e-mail."""
     try:
+        supabase = get_supabase()  # ← Chama aqui, não no import
+
         response = (
             supabase
             .from_("usuarios")
@@ -66,28 +63,16 @@ def buscar_usuario_por_email(email: str) -> dict | None:
         return None
 
 def cadastrar_usuario(nome: str, email: str, senha: str, tipo_usuario: str = "tutor") -> tuple[bool, str]:
-    """
-    Cadastra um novo usuário.
-
-    Args:
-        nome: Nome completo
-        email: E-mail
-        senha: Senha em texto plano
-        tipo_usuario: "tutor", "clinica" ou "veterinario"
-
-    Returns:
-        (sucesso, mensagem)
-    """
+    """Cadastra um novo usuário."""
     try:
-        # Verifica se o e-mail já existe
+        supabase = get_supabase()  # ← Chama aqui, não no import
+
         usuario_existente = buscar_usuario_por_email(email)
         if usuario_existente:
             return False, "❌ Este e-mail já está cadastrado."
 
-        # Hash da senha
         senha_hash = hash_password(senha)
 
-        # Insere o novo usuário
         payload = {
             "nome": nome,
             "email": email,
@@ -106,3 +91,4 @@ def cadastrar_usuario(nome: str, email: str, senha: str, tipo_usuario: str = "tu
         return False, f"❌ Erro ao cadastrar: {e}"
 
 __all__ = ["verificar_credenciais", "buscar_usuario_por_email", "cadastrar_usuario"]
+

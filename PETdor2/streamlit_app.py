@@ -1,6 +1,11 @@
-import sys
 import os
-import streamlit as st
+import sys
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR))
+
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 # ==========================================================
 # AJUSTE DE PATH (CORRETO E ÚNICO)
@@ -25,7 +30,7 @@ if PROJECT_ROOT not in sys.path:
 
 from pages.login import render as login_app
 from pages.cadastro import render as cadastro_app
-from PETdor2.pages.avaliacao import render as avaliacao_app
+from pages.avaliacao import render as avaliacao_app
 from pages.cadastro_pet import render as cadastro_pet_app
 from pages.historico import render as historico_app
 from pages.admin import render as admin_app

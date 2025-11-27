@@ -19,15 +19,16 @@ if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 # --- Fim correção ---
 
-from utils.config import SMTP_SERVIDOR, SMTP_PORTA, SMTP_EMAIL, SMTP_SENHA, SMTP_USAR_SSL
+from backend.utils.config import SMTP_SERVIDOR, SMTP_PORTA, SMTP_EMAIL, SMTP_SENHA, SMTP_USAR_SSL
 
 logger = logging.getLogger(__name__)
+
 
 # ============================================================
 # Função genérica de envio de e-mail
 # ============================================================
 def enviar_email(destinatario: str, assunto: str, corpo_html: str) -> tuple[bool, str]:
-    """Envia um e-mail HTML usando configurações do config.py."""
+    """Envia um e-mail HTML usando as configurações do config.py."""
     if not all([SMTP_SERVIDOR, SMTP_EMAIL, SMTP_SENHA, SMTP_PORTA]):
         logger.error("Configurações SMTP ausentes. Não é possível enviar e-mail.")
         return False, "Erro: configuração SMTP ausente no sistema."
@@ -40,7 +41,6 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str) -> tuple[bool
 
     try:
         context = ssl.create_default_context()
-
         if SMTP_USAR_SSL:
             with smtplib.SMTP_SSL(SMTP_SERVIDOR, SMTP_PORTA, context=context) as server:
                 server.login(SMTP_EMAIL, SMTP_SENHA)
@@ -64,10 +64,11 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str) -> tuple[bool
         logger.error(f"Erro inesperado ao enviar e-mail: {e}")
         return False, f"Erro ao enviar e-mail: {e}"
 
+
 # ============================================================
 # E-mail de confirmação de conta
 # ============================================================
-def enviar_email_confirmacao(destinatario_email: str, nome_usuario: str, link_confirmacao: str):
+def enviar_email_confirmacao(destinatario_email: str, nome_usuario: str, link_confirmacao: str) -> tuple[bool, str]:
     """Envia e-mail de confirmação de cadastro."""
     assunto = "Confirme seu E-mail - PETDOR"
     corpo_html = f"""
@@ -89,10 +90,11 @@ def enviar_email_confirmacao(destinatario_email: str, nome_usuario: str, link_co
     """
     return enviar_email(destinatario_email, assunto, corpo_html)
 
+
 # ============================================================
 # E-mail de recuperação de senha
 # ============================================================
-def enviar_email_recuperacao_senha(destinatario_email: str, nome_usuario: str, link_reset: str):
+def enviar_email_recuperacao_senha(destinatario_email: str, nome_usuario: str, link_reset: str) -> tuple[bool, str]:
     """Envia e-mail com link para redefinir a senha."""
     assunto = "Redefinição de Senha - PETDOR"
     corpo_html = f"""

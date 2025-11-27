@@ -14,7 +14,7 @@ def render():
     st.header("📧 Confirmar E-mail")
 
     # Obtém token da URL
-    query_params = st.query_params
+    query_params = st.experimental_get_query_params()
     token = query_params.get("token", [None])[0]
 
     if not token:
@@ -44,3 +44,4 @@ def render():
         st.error(f"❌ Erro ao confirmar e-mail: {mensagem}")
 
 __all__ = ["render"]
+

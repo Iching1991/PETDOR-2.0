@@ -1,61 +1,36 @@
+# PETdor2/backend/pages/login.py
 import streamlit as st
-from utils.validators import validar_email
-from utils.tokens import gerar_token_sessao
-from database.connection import conectar_db
-
-
-def autenticar_usuario(email, senha):
-    """Verifica se o usuário existe e se a senha está correta."""
-    conn = conectar_db()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT id, senha FROM usuarios WHERE email = ?", (email,))
-    row = cursor.fetchone()
-
-    conn.close()
-
-    # Se não encontrou usuário
-    if row is None:
-        return None
-
-    user_id, senha_correta = row
-
-    # Aqui você pode trocar por hash (bcrypt) se quiser
-    if senha != senha_correta:
-        return None
-
-    return user_id
-
+from ..auth.user import verificar_credenciais
+from ..utils.validators import validar_email
+from ..utils.tokens import gerar_token_sessao  # se você quiser gerar token extra
 
 def render():
-    st.title("🔐 Login")
+    st.header("🔐 Login")
     st.write("Acesse sua conta para continuar.")
 
-    email = st.text_input("Email")
+    email = st.text_input("E-mail")
     senha = st.text_input("Senha", type="password")
 
     if st.button("Entrar"):
-
-        # 1) Validação de email
+        # 1️⃣ Validação de e-mail
         if not validar_email(email):
             st.error("❌ Email inválido.")
             return
 
-        # 2) Autenticação
-        user_id = autenticar_usuario(email, senha)
+        # 2️⃣ Autenticação via Supabase
+        success, usuario = verificar_credenciais(email, senha)
 
-        if user_id:
-            token = gerar_token_sessao(user_id)
+        if success:
+            # 3️⃣ Cria token de sessão opcional
+            token = gerar_token_sessao(usuario.get("id")) if "id" in usuario else None
 
-            # 3) Armazena sessão
+            # 4️⃣ Armazena session_state
             st.session_state["logged_in"] = True
-            st.session_state["user_id"] = user_id
+            st.session_state["user_id"] = usuario.get("id")
+            st.session_state["user_type"] = usuario.get("tipo", "tutor")
             st.session_state["token"] = token
 
             st.success("✔ Login realizado com sucesso!")
-
-            # 4) Redireciona para tela inicial
-            st.switch_page("pages/home.py")
-
+            st.experimental_rerun()  # atualiza a página
         else:
-            st.error("❌ Email ou senha incorretos.")
+            st.error(usuario.get("erro", "❌ Email ou senha incorretos."))

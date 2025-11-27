@@ -14,11 +14,13 @@ def autenticar_usuario(email, senha):
 
     conn.close()
 
+    # Se não encontrou usuário
     if row is None:
-        return None  # Usuário não encontrado
+        return None
 
     user_id, senha_correta = row
 
+    # Aqui você pode trocar por hash (bcrypt) se quiser
     if senha != senha_correta:
         return None
 
@@ -33,19 +35,27 @@ def render():
     senha = st.text_input("Senha", type="password")
 
     if st.button("Entrar"):
+
+        # 1) Validação de email
         if not validar_email(email):
             st.error("❌ Email inválido.")
             return
 
+        # 2) Autenticação
         user_id = autenticar_usuario(email, senha)
 
         if user_id:
             token = gerar_token_sessao(user_id)
+
+            # 3) Armazena sessão
             st.session_state["logged_in"] = True
             st.session_state["user_id"] = user_id
             st.session_state["token"] = token
 
             st.success("✔ Login realizado com sucesso!")
+
+            # 4) Redireciona para tela inicial
             st.switch_page("pages/home.py")
+
         else:
             st.error("❌ Email ou senha incorretos.")

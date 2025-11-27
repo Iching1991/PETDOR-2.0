@@ -1,1 +1,43 @@
+# PETdor2/docker-compose.yml
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_SERVER_ENABLE_CORS=false
+    env_file:
+      - .env.local
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - frontend
+    networks:
+      - petdor-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://backend:8501
+    env_file:
+      - .env.local
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - petdor-network
+
+networks:
+  petdor-network:
+    driver: bridge
 

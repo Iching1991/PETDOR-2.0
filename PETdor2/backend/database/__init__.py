@@ -1,14 +1,25 @@
-# PETdor2/database/__init__.py
+# PETdor2/backend/database/__init__.py
 """
-Pacote para gerenciamento de banco de dados do PETDOR.
-Gerencia conexões e operações com Supabase.
+Módulo de banco de dados - Supabase PostgreSQL
 """
-import logging
+from .supabase_client import (
+    get_connection,
+    testar_conexao,
+    executar_query,
+    buscar_dados,
+    buscar_um,
+    inserir_dados,
+    atualizar_dados,
+    deletar_dados,
+)
 
-logger = logging.getLogger(__name__)
-
-# Importa apenas o cliente Supabase
-from database.supabase_client import supabase
-
-# Exponha o cliente Supabase para uso em todo o projeto
-__all__ = ["supabase"]
+__all__ = [
+    "get_connection",
+    "testar_conexao",
+    "executar_query",
+    "buscar_dados",
+    "buscar_um",
+    "inserir_dados",
+    "atualizar_dados",
+    "deletar_dados",
+]

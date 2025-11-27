@@ -1,7 +1,8 @@
 streamlit==1.28.0
 python-dotenv==1.0.0
 bcrypt==4.1.0
-pyjwt>=2.8.0,<3.0.0
+pyjwt>=2.8.0,<3.0.0  # Esta linha está correta agora
 requests==2.31.0
 supabase==2.4.0
-python-telegram-bot==20.3
+python-telegram-bot==20.3 # Assumindo que "atual" significa 20.3
+# psycopg2-binary==2.9.9 (REMOVA ESTA LINHA COMPLETAMENTE)

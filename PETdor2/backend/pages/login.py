@@ -1,51 +1,51 @@
-# PETdor2/backend/pages/login.py
-
 import streamlit as st
-import logging
-from auth.login_handler import autenticar_usuario
-from utils.session import iniciar_sessao
+from utils.validators import validar_email
+from utils.tokens import gerar_token_sessao
+from database.connection import conectar_db
 
-logger = logging.getLogger(__name__)
 
-def get_query_params():
-    """Compatível com qualquer versão do Streamlit."""
-    try:
-        return st.query_params  # Streamlit 1.30+
-    except Exception:
-        return st.experimental_get_query_params()  # versões antigas
+def autenticar_usuario(email, senha):
+    """Verifica se o usuário existe e se a senha está correta."""
+    conn = conectar_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id, senha FROM usuarios WHERE email = ?", (email,))
+    row = cursor.fetchone()
+
+    conn.close()
+
+    if row is None:
+        return None  # Usuário não encontrado
+
+    user_id, senha_correta = row
+
+    if senha != senha_correta:
+        return None
+
+    return user_id
 
 
 def render():
-    """Página de Login"""
     st.title("🔐 Login")
+    st.write("Acesse sua conta para continuar.")
 
-    # Lê query params
-    query_params = get_query_params()
-
-    st.subheader("Acesse sua conta")
-
-    email = st.text_input("E-mail")
+    email = st.text_input("Email")
     senha = st.text_input("Senha", type="password")
 
     if st.button("Entrar"):
-        if not email or not senha:
-            st.warning("⚠️ Preencha todos os campos.")
+        if not validar_email(email):
+            st.error("❌ Email inválido.")
             return
 
-        sucesso, dados = autenticar_usuario(email, senha)
+        user_id = autenticar_usuario(email, senha)
 
-        if not sucesso:
-            st.error("❌ E-mail ou senha incorretos.")
-            return
+        if user_id:
+            token = gerar_token_sessao(user_id)
+            st.session_state["logged_in"] = True
+            st.session_state["user_id"] = user_id
+            st.session_state["token"] = token
 
-        iniciar_sessao(dados)
-
-        st.success("✅ Login realizado com sucesso!")
-        st.rerun()
-
-    st.markdown("---")
-
-    st.info("Ainda não tem conta?")
-    if st.button("Criar conta"):
-        st.session_state.pagina = "registrar"
-        st.rerun()
+            st.success("✔ Login realizado com sucesso!")
+            st.switch_page("pages/home.py")
+        else:
+            st.error("❌ Email ou senha incorretos.")

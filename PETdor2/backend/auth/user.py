@@ -1,4 +1,4 @@
-# PETdor2/auth/user.py
+# PETdor2/backend/auth/user.py
 """
 Módulo de usuários - autenticação e gerenciamento de contas.
 """
@@ -6,10 +6,9 @@ import logging
 from datetime import datetime
 
 from .security import hash_password, verify_password
-from backend.database.supabase_client import get_supabase
+from ..database.supabase_client import get_supabase  # import relativo corrigido
 
 logger = logging.getLogger(__name__)
-
 
 # ==========================================================
 # LOGIN / AUTENTICAÇÃO
@@ -37,9 +36,8 @@ def verificar_credenciais(email: str, senha: str) -> tuple[bool, dict]:
         return True, usuario
 
     except Exception as e:
-        logger.error(f"Erro ao verificar credenciais: {e}")
+        logger.error(f"Erro ao verificar credenciais: {e}", exc_info=True)
         return False, {"erro": str(e)}
-
 
 # ==========================================================
 # BUSCA DE USUÁRIO
@@ -61,7 +59,6 @@ def buscar_usuario_por_email(email: str) -> dict | None:
         logger.warning(f"Usuário não encontrado: {email}")
         return None
 
-
 # ==========================================================
 # CADASTRO
 # ==========================================================
@@ -76,17 +73,15 @@ def cadastrar_usuario(
     try:
         supabase = get_supabase()
 
-        # Já existe?
-        usuario_existente = buscar_usuario_por_email(email)
-        if usuario_existente:
+        # Verifica se já existe
+        if buscar_usuario_por_email(email):
             return False, "❌ Este e-mail já está cadastrado."
 
-        # Validações
+        # Valida senha
         if len(senha) < 6:
             return False, "❌ A senha deve ter pelo menos 6 caracteres."
 
         senha_hash = hash_password(senha)
-
         payload = {
             "nome": nome,
             "email": email.lower(),
@@ -112,7 +107,6 @@ def cadastrar_usuario(
         logger.error(f"Erro ao cadastrar usuário: {e}", exc_info=True)
         return False, f"❌ Erro ao cadastrar: {str(e)}"
 
-
 # ==========================================================
 # REDEFINIR SENHA
 # ==========================================================
@@ -121,7 +115,6 @@ def redefinir_senha(usuario_id: int, senha_atual: str, nova_senha: str) -> tuple
     try:
         supabase = get_supabase()
 
-        # Busca dados
         response = (
             supabase.from_("usuarios")
             .select("senha_hash")
@@ -141,18 +134,14 @@ def redefinir_senha(usuario_id: int, senha_atual: str, nova_senha: str) -> tuple
             return False, "❌ A nova senha deve ter pelo menos 8 caracteres."
 
         nova_senha_hash = hash_password(nova_senha)
-
-        supabase.from_("usuarios").update({
-            "senha_hash": nova_senha_hash
-        }).eq("id", usuario_id).execute()
+        supabase.from_("usuarios").update({"senha_hash": nova_senha_hash}).eq("id", usuario_id).execute()
 
         logger.info(f"🔐 Senha redefinida para usuário {usuario_id}")
         return True, "✅ Senha alterada com sucesso!"
 
     except Exception as e:
-        logger.error(f"Erro ao redefinir senha: {e}")
+        logger.error(f"Erro ao redefinir senha: {e}", exc_info=True)
         return False, f"❌ Erro ao redefinir senha: {str(e)}"
-
 
 # ==========================================================
 # ALTERAÇÕES DE PERMISSÃO E STATUS
@@ -165,9 +154,8 @@ def atualizar_tipo_usuario(usuario_id: int, novo_tipo: str) -> bool:
         logger.info(f"🔄 Tipo atualizado para {usuario_id}: {novo_tipo}")
         return True
     except Exception as e:
-        logger.error(f"Erro ao atualizar tipo: {e}")
+        logger.error(f"Erro ao atualizar tipo: {e}", exc_info=True)
         return False
-
 
 def atualizar_status_usuario(usuario_id: int, ativo: bool) -> bool:
     """Ativa ou desativa um usuário."""
@@ -180,9 +168,8 @@ def atualizar_status_usuario(usuario_id: int, ativo: bool) -> bool:
         return True
 
     except Exception as e:
-        logger.error(f"Erro ao atualizar status: {e}")
+        logger.error(f"Erro ao atualizar status: {e}", exc_info=True)
         return False
-
 
 # ==========================================================
 # EXPORTS
@@ -195,4 +182,3 @@ __all__ = [
     "atualizar_tipo_usuario",
     "atualizar_status_usuario",
 ]
-

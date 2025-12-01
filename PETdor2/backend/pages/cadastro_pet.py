@@ -7,8 +7,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Importa as funções do Supabase Client
-# Certifique-se de que estas funções existem e estão expostas em supabase_client.py
-from ..database.supabase_client import supabase_table_insert, supabase_table_select
+# A importação correta é de '.database.supabase_client' porque 'pages' e 'database'
+# são subpacotes do mesmo nível (ambos dentro de 'backend').
+from .database.supabase_client import supabase_table_insert, supabase_table_select
 from ..especies.index import listar_especies  # lista de espécies local
 
 # ==========================================================
@@ -16,6 +17,7 @@ from ..especies.index import listar_especies  # lista de espécies local
 # ==========================================================
 def format_especie_nome(especie_cfg) -> str:
     """Formata nome da espécie no selectbox."""
+    # Assumindo que especie_cfg é um objeto/dataclass com um atributo 'nome'
     return especie_cfg.nome
 
 def cadastrar_pet_db(tutor_id: int, nome: str, especie_nome: str, raca: Optional[str]=None, peso: Optional[float]=None) -> bool:
@@ -70,6 +72,7 @@ def listar_pets_db(tutor_id: int) -> List[Dict[str, Any]]:
 def render():
     st.header("🐾 Cadastro de Pet")
     user = st.session_state.get("usuario")
+
     if not user:
         st.warning("Faça login para cadastrar pets.")
         return
@@ -77,7 +80,7 @@ def render():
     tutor_id = user["id"]
 
     with st.form("form_cadastro_pet"):
-        nome = st.text_input("Nome do pet")
+        nome = st.text_input("Nome do pet", key="pet_nome_input") # Adicionado key para evitar problemas de re-render
         especies = listar_especies()
 
         # Garante que especies não está vazia antes de tentar selecionar
@@ -88,11 +91,12 @@ def render():
             especie_cfg = st.selectbox(
                 "Espécie",
                 options=especies,
-                format_func=format_especie_nome
+                format_func=format_especie_nome,
+                key="pet_especie_select" # Adicionado key
             )
 
-        raca = st.text_input("Raça (opcional)")
-        peso = st.number_input("Peso (kg)", min_value=0.0, step=0.1, format="%.1f") # Formato para exibir 1 casa decimal
+        raca = st.text_input("Raça (opcional)", key="pet_raca_input") # Adicionado key
+        peso = st.number_input("Peso (kg)", min_value=0.0, step=0.1, format="%.1f", key="pet_peso_input") # Adicionado key
         enviado = st.form_submit_button("Cadastrar Pet")
 
     if enviado:
@@ -108,27 +112,30 @@ def render():
             )
             if sucesso:
                 st.success(f"Pet '{nome}' cadastrado com sucesso!")
-                # Opcional: Limpar o formulário após o sucesso
-                # st.experimental_rerun() # Isso reinicia o app, pode ser demais
-                # Ou limpar campos manualmente se possível (Streamlit não facilita)
+                # Para limpar o formulário após o sucesso, uma opção é usar st.rerun()
+                # ou resetar os valores dos widgets se eles tiverem chaves (keys)
+                # st.session_state["pet_nome_input"] = "" # Exemplo de como limpar, mas Streamlit pode ser complicado com forms
+                # st.session_state["pet_raca_input"] = ""
+                # st.session_state["pet_peso_input"] = 0.0
+                st.rerun() # Reinicia o app para limpar o formulário e atualizar a lista de pets
 
     st.markdown("---")
-    st.subheader("Seus pets")
+    st.subheader("Seus pets cadastrados")
     pets = listar_pets_db(tutor_id)
 
     if not pets:
         st.info("Nenhum pet cadastrado ainda.")
     else:
-        # Exibe os pets em um formato mais organizado, talvez com st.columns ou st.expander
-        for p in pets:
-            col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-            with col1:
-                st.write(f"**Nome:** {p.get('nome') or 'Não informado'}")
-            with col2:
-                st.write(f"**Espécie:** {p.get('especie') or 'Não informada'}")
-            with col3:
-                st.write(f"**Raça:** {p.get('raca') or 'Não informada'}")
-            with col4:
-                peso_str = f"{p.get('peso'):.1f} kg" if p.get("peso") else "Não informado"
-                st.write(f"**Peso:** {peso_str}")
-            st.markdown("---") # Separador para cada pet
+        # Exibe os pets em um formato mais organizado usando st.expander
+        for i, p in enumerate(pets):
+            nome_pet = p.get("nome") or "Nome não informado"
+            especie_pet = p.get("especie") or "Espécie não informada"
+            raca_pet = p.get("raca") or "Raça não informada"
+            peso_pet = f"{p.get('peso'):.1f} kg" if p.get("peso") else "Não informado"
+
+            with st.expander(f"**{nome_pet}** ({especie_pet})"):
+                st.write(f"**Raça:** {raca_pet}")
+                st.write(f"**Peso:** {peso_pet}")
+                # Adicione mais detalhes do pet aqui se houver
+                # st.write(f"ID do Pet: {p.get('id')}") # Exemplo
+            # st.markdown("---") # O expander já serve como separador visual

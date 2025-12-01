@@ -26,19 +26,19 @@ if script_dir not in sys.path:
 # Módulos de Autenticação e Usuário
 from auth.user import (
     buscar_usuario_por_email, verificar_credenciais, cadastrar_usuario,
-    atualizar_tipo_usuario, atualizar_status_usuario
+    atualizar_tipo_usuario, atualizar_status_usuario, redefinir_senha # redefinir_senha agora vem de auth.user
 )
 from auth.security import (
     gerar_token_reset_senha, validar_token_reset_senha,
     gerar_token_confirmacao_email, validar_token_confirmacao_email,
-    hash_senha, verificar_senha
+    hash_password, verify_password # Nomes corretos das funções de hash
 )
-from auth.password_reset import solicitar_reset_senha, validar_token_reset, redefinir_senha_com_token
+from auth.password_reset import solicitar_reset_senha, redefinir_senha_com_token # Importa funções específicas de reset
 from auth.email_confirmation import enviar_email_confirmacao_usuario
 
 # Módulos de Páginas
 from pages.login import render as login_app_render
-from pages.cadastro import render as cadastro_app_render # Adicionada a página de cadastro
+from pages.cadastro import render as cadastro_app_render
 from pages.cadastro_pet import render as cadastro_pet_app_render
 from pages.avaliacao import render as avaliacao_app_render
 from pages.admin import render as admin_app_render # Página de administração
@@ -51,20 +51,18 @@ from utils.config import APP_CONFIG, STREAMLIT_APP_URL # Importa configurações
 # ===============================
 # Configuração da página Streamlit
 # ===============================
-st.set_page_config(page_title=APP_CONFIG["titulo"], layout="wide") # Usando APP_CONFIG e layout wide
+st.set_page_config(page_title=APP_CONFIG["titulo"], layout="wide")
 st.title(f"🐾 {APP_CONFIG['titulo']} – Sistema PETDOR")
 
 # ===============================
 # Inicialização do Banco de Dados e Migrações
 # ===============================
-# Testar conexão com Supabase no início do app
 if "supabase_connected" not in st.session_state:
     st.session_state.supabase_connected = False
     sucesso_conexao, msg_conexao = testar_conexao()
     if sucesso_conexao:
         st.session_state.supabase_connected = True
         logger.info("Conexão com Supabase estabelecida com sucesso.")
-        # Executar migração de colunas de desativação
         sucesso_migracao, msg_migracao = migrar_colunas_desativacao()
         if sucesso_migracao:
             logger.info(f"Migração de colunas de desativação: {msg_migracao}")
@@ -74,7 +72,7 @@ if "supabase_connected" not in st.session_state:
     else:
         logger.error(f"Falha na conexão com Supabase: {msg_conexao}")
         st.error(f"Erro crítico: Não foi possível conectar ao banco de dados. {msg_conexao}")
-        st.stop() # Impede que o app continue se não houver conexão com o DB
+        st.stop()
 
 # ===============================
 # Inicializa session_state para o aplicativo
@@ -82,9 +80,9 @@ if "supabase_connected" not in st.session_state:
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "page" not in st.session_state:
-    st.session_state.page = "Login"  # página inicial padrão
+    st.session_state.page = "Login"
 if "user" not in st.session_state:
-    st.session_state.user = None # Armazena os dados do usuário logado
+    st.session_state.user = None
 
 # ===============================
 # Lógica principal do aplicativo
@@ -98,39 +96,45 @@ if "action" in query_params:
 
     if action == "confirm_email" and token:
         st.subheader("Confirmação de E-mail")
-        sucesso, mensagem = validar_token_confirmacao_email(token)
+        sucesso, usuario_id, email_usuario, mensagem = validar_token_confirmacao_email(token)
         if sucesso:
-            st.success(mensagem)
-            # Opcional: Redirecionar para login após a confirmação
-            st.session_state.page = "Login"
-            st.query_params.clear() # Limpa os parâmetros da URL
-            st.rerun()
+            # Atualiza o status de email_confirmado no banco de dados
+            if usuario_id:
+                sucesso_atualizacao = atualizar_email_confirmado(usuario_id, True) # Função de auth.user
+                if sucesso_atualizacao:
+                    st.success(mensagem)
+                    st.session_state.page = "Login"
+                else:
+                    st.error("Erro ao atualizar status de confirmação no banco de dados.")
+            else:
+                st.error("ID de usuário não encontrado no token de confirmação.")
         else:
             st.error(mensagem)
     elif action == "reset_password" and token:
         st.subheader("Redefinir Senha")
-        # Renderiza a UI para redefinir a senha com o token
-        sucesso, mensagem = validar_token_reset(token)
-        if sucesso:
+        sucesso, email_usuario, mensagem = validar_token_reset_senha(token) # Retorna email_usuario e mensagem
+        if sucesso and email_usuario:
+            st.info(f"Redefinindo senha para: {email_usuario}")
             nova_senha = st.text_input("Nova Senha", type="password")
             confirmar_senha = st.text_input("Confirmar Nova Senha", type="password")
             if st.button("Redefinir Senha"):
                 if nova_senha and nova_senha == confirmar_senha:
-                    sucesso_reset, msg_reset = redefinir_senha_com_token(token, nova_senha)
+                    # Chama a função de redefinição de senha que usa o email
+                    sucesso_reset, msg_reset = redefinir_senha_com_token(token, nova_senha) # De auth.password_reset
                     if sucesso_reset:
                         st.success(msg_reset)
                         st.session_state.page = "Login"
-                        st.query_params.clear()
-                        st.rerun()
                     else:
                         st.error(msg_reset)
                 else:
                     st.error("As senhas não coincidem ou estão vazias.")
         else:
-            st.error(mensagem)
-    # Limpa os query_params após processar para evitar re-execução
+            st.error(mensagem) # Mensagem de erro do validar_token_reset_senha
+
+    # Limpa os query_params e força um rerun para evitar que a URL persista
+    # e o Streamlit tente reprocessar o token em cada interação.
     st.query_params.clear()
-    st.rerun() # Força um rerun para limpar a URL e mostrar a página padrão
+    st.rerun()
 
 # Se o usuário está logado, mostra o menu lateral e as páginas
 if st.session_state.logged_in:
@@ -143,7 +147,7 @@ if st.session_state.logged_in:
     }
 
     # Adiciona a página de administração apenas se o usuário for Admin
-    if st.session_state.user.get("tipo_usuario") == "Admin":
+    if st.session_state.user.get("tipo") == "Admin": # Usa 'tipo' conforme definido em auth.user
         app_pages["Administração"] = admin_app_render
 
     # Define a página inicial padrão após o login (pode ser Avaliação de Dor)
@@ -162,11 +166,12 @@ if st.session_state.logged_in:
     if render_function:
         render_function()
     else:
-        st.error("Página não encontrada ou não implementada.") # Para o caso de "Administração" ainda não ter um render
+        st.error("Página não encontrada ou não implementada.")
 
     if st.sidebar.button("Sair"):
         st.session_state.clear()
-        st.experimental_rerun() # st.rerun() é o preferido em versões mais novas
+        st.rerun() # Usar st.rerun()
+
 else:
     # Se não está logado, mostra as opções de Login e Cadastro
     col1, col2 = st.columns(2)
@@ -187,17 +192,15 @@ else:
         st.session_state.page = "Login"
         login_app_render()
 
-# Lógica para solicitar reset de senha (pode ser um link no login_app_render)
-# ou um botão aqui no app principal
+# Lógica para solicitar reset de senha (botão no app principal)
 if st.session_state.page == "Login" and st.button("Esqueceu sua senha?", key="btn_forgot_password"):
     email_reset = st.text_input("Digite seu e-mail para resetar a senha:")
     if st.button("Enviar link de reset"):
         if email_reset:
-            sucesso, mensagem = solicitar_reset_senha(email_reset)
+            sucesso, mensagem = solicitar_reset_senha(email_reset) # De auth.password_reset
             if sucesso:
                 st.success(mensagem)
             else:
                 st.error(mensagem)
         else:
             st.error("Por favor, digite um e-mail.")
-

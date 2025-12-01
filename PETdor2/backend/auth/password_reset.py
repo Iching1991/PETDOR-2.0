@@ -1,52 +1,52 @@
-# PETdor2/auth/password_reset.py
+# PETdor2/backend/auth/password_reset.py
 """
 Módulo de recuperação de senha - gerencia reset de senhas.
 Usa tokens JWT com expiração de 1 hora.
 """
 import logging
-from datetime import datetime, timedelta
-from .security import generate_reset_token, verify_reset_token, hash_password
+from datetime import datetime, timedelta, timezone
+from typing import Tuple, Dict, Any, Optional
+
+# Importações absolutas a partir do pacote 'backend'
+# Ajustado para os nomes das funções que definimos em auth.security
+from auth.security import gerar_token_reset_senha, validar_token_reset_senha, hash_password
 from utils.email_sender import enviar_email_recuperacao_senha
 from database.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
 
-def solicitar_reset_senha(email: str) -> tuple[bool, str]:
+def solicitar_reset_senha(email: str) -> Tuple[bool, str]:
     """
-    Gera token JWT de reset, salva no DB e envia e-mail.
-    Retorna (True, msg) sempre que possível para não vazar existência de e-mail.
+    Gera um token de reset de senha, armazena no DB e envia e-mail.
     """
     try:
         supabase = get_supabase()
 
         # 1. Buscar usuário
-        response = (
-            supabase
-            .from_("usuarios")
-            .select("id, nome, email")
-            .eq("email", email.lower())
-            .execute()
-        )
+        response = supabase.from_("usuarios").select("id, nome, email").eq("email", email.lower()).single().execute()
+        usuario = response.data
 
-        if not response.data:
-            logger.warning(f"Tentativa de reset para e-mail não encontrado: {email}")
-            return True, "Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha."
+        if not usuario:
+            logger.warning(f"Tentativa de reset de senha para e-mail não encontrado: {email}")
+            # Por segurança, sempre retornar sucesso para não vazar informações de usuários existentes
+            return True, "✅ Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha."
 
-        usuario = response.data[0]
         usuario_id = usuario["id"]
-        nome = usuario["nome"]
-        email_db = usuario["email"]
+        nome_usuario = usuario["nome"]
 
         # 2. Gerar token JWT
-        token = generate_reset_token(email_db)
-        expires_at = datetime.utcnow() + timedelta(hours=1)
+        # Usando a função renomeada de auth.security
+        reset_token_jwt = gerar_token_reset_senha(usuario_id, email)
 
-        # 3. Salvar token no Supabase
+        # 3. Armazenar token e expiração no Supabase
+        # A expiração do token no banco de dados deve ser a mesma do JWT para consistência
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1) # Token JWT expira em 1 hora
+
         update_response = (
             supabase
             .from_("usuarios")
             .update({
-                "reset_password_token": token,
+                "reset_password_token": reset_token_jwt,
                 "reset_password_expires": expires_at.isoformat()
             })
             .eq("id", usuario_id)
@@ -54,86 +54,88 @@ def solicitar_reset_senha(email: str) -> tuple[bool, str]:
         )
 
         if not update_response.data:
-            logger.error(f"Erro ao salvar token para {email_db}")
-            return True, "Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha."
+            logger.error(f"Erro ao armazenar token de reset para {email}: {update_response.status_code} - {update_response.text}")
+            return False, "❌ Erro interno ao solicitar redefinição de senha."
 
         # 4. Enviar e-mail
-        try:
-            reset_link = f"https://petdor.streamlit.app?page=password_reset&token={token}"
-            enviado, msg = enviar_email_recuperacao_senha(email_db, nome, reset_link)
-            if enviado:
-                logger.info(f"✅ E-mail de reset enviado para {email_db}")
-            else:
-                logger.warning(f"⚠️ Falha ao enviar e-mail: {msg}")
-        except Exception as e:
-            logger.warning(f"Erro ao enviar e-mail: {e}")
-
-        return True, "Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha."
-
-    except Exception as e:
-        logger.error(f"Erro em solicitar_reset_senha: {e}", exc_info=True)
-        return True, "Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha."
-
-def validar_token_reset(token: str) -> tuple[bool, dict]:
-    """
-    Valida token de reset de senha.
-
-    Retorna:
-        (True, {"email": email, "usuario_id": id}) se válido
-        (False, {"erro": mensagem}) se inválido
-    """
-    try:
-        # 1. Validar token JWT
-        token_valido, payload = verify_reset_token(token)
-        if not token_valido:
-            logger.warning(f"Token JWT inválido ou expirado")
-            return False, {"erro": "Token inválido ou expirado."}
-
-        email_jwt = payload.get("email")
-
-        # 2. Buscar no banco para validar expiração adicional
-        supabase = get_supabase()
-        response = (
-            supabase
-            .from_("usuarios")
-            .select("id, email, reset_password_expires")
-            .eq("reset_password_token", token)
-            .single()
-            .execute()
+        sucesso_email, msg_email = enviar_email_recuperacao_senha(
+            destinatario_email=email,
+            destinatario_nome=nome_usuario,
+            token=reset_token_jwt
         )
 
-        if not response.data:
-            logger.warning(f"Token não encontrado no banco")
-            return False, {"erro": "Token não encontrado."}
+        if not sucesso_email:
+            logger.error(f"Falha ao enviar e-mail de recuperação de senha para {email}: {msg_email}")
+            return False, "❌ Erro ao enviar e-mail de recuperação. Tente novamente mais tarde."
 
+        logger.info(f"✅ Link de reset de senha enviado para {email}")
+        return True, "✅ Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha."
+
+    except Exception as e:
+        logger.error(f"Erro em solicitar_reset_senha para {email}: {e}", exc_info=True)
+        return False, f"❌ Erro interno ao solicitar redefinição de senha: {str(e)}"
+
+def validar_token_reset(token: str) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Valida o token de reset de senha.
+    Retorna (True, {"email": email, "usuario_id": id}) se válido,
+    ou (False, {"erro": mensagem}) se inválido/expirado.
+    """
+    try:
+        # 1. Validar o token JWT
+        # Usando a função renomeada de auth.security
+        payload = validar_token_reset_senha(token)
+        if not payload:
+            return False, {"erro": "Token inválido ou expirado."}
+
+        usuario_id_jwt = payload.get("usuario_id")
+        email_jwt = payload.get("email")
+
+        if not usuario_id_jwt or not email_jwt:
+            logger.warning(f"Token de reset inválido: payload incompleto. Payload: {payload}")
+            return False, {"erro": "Token inválido (dados incompletos)."}
+
+        # 2. Buscar usuário no banco e verificar token
+        supabase = get_supabase()
+        response = supabase.from_("usuarios").select("id, email, reset_password_token, reset_password_expires").eq("id", usuario_id_jwt).single().execute()
         usuario = response.data
+
+        if not usuario:
+            logger.warning(f"Usuário não encontrado para token de reset JWT ID: {usuario_id_jwt}")
+            return False, {"erro": "Token inválido."} # Usuário não existe mais ou ID incorreto
+
+        # Verifica se o token no banco corresponde ao token fornecido
+        if usuario.get("reset_password_token") != token:
+            logger.warning(f"Token de reset no banco não corresponde ao token fornecido para {email_jwt}")
+            return False, {"erro": "Token inválido ou já utilizado."}
+
         email_db = usuario["email"]
         usuario_id = usuario["id"]
         expires_str = usuario["reset_password_expires"]
 
         # 3. Validar expiração no banco
-        if isinstance(expires_str, str):
-            expires_dt = datetime.fromisoformat(expires_str)
+        if expires_str:
+            expires_dt = datetime.fromisoformat(expires_str).replace(tzinfo=timezone.utc) # Garante timezone-aware
+            if expires_dt < datetime.now(timezone.utc):
+                logger.warning(f"Token expirado no banco para {email_db}")
+                return False, {"erro": "Token expirado. Solicite um novo link."}
         else:
-            expires_dt = expires_str
-
-        if expires_dt < datetime.utcnow():
-            logger.warning(f"Token expirado para {email_db}")
-            return False, {"erro": "Token expirado. Solicite um novo link."}
+            logger.warning(f"Token de reset sem data de expiração no banco para {email_db}")
+            return False, {"erro": "Token inválido (expiração não definida)."}
 
         # 4. Validar consistência entre JWT e banco
-        if email_jwt != email_db:
+        if email_jwt.lower() != email_db.lower():
             logger.warning(f"Email inconsistente: JWT={email_jwt}, DB={email_db}")
             return False, {"erro": "Token inválido."}
 
-        logger.info(f"✅ Token válido para {email_db}")
+        logger.info(f"✅ Token de reset válido para {email_db}")
         return True, {"email": email_db, "usuario_id": usuario_id}
 
     except Exception as e:
         logger.error(f"Erro em validar_token_reset: {e}", exc_info=True)
         return False, {"erro": str(e)}
 
-def redefinir_senha_com_token(token: str, nova_senha: str) -> tuple[bool, str]:
+def redefinir_senha_com_token(token: str, nova_senha: str) -> Tuple[bool, str]:
     """
     Redefine senha se token válido; limpa token no DB.
     """
@@ -145,6 +147,9 @@ def redefinir_senha_com_token(token: str, nova_senha: str) -> tuple[bool, str]:
 
         email = dados.get("email")
         usuario_id = dados.get("usuario_id")
+
+        if not usuario_id:
+            return False, "Erro interno: ID do usuário não encontrado no token."
 
         # 2. Validar força da senha
         if len(nova_senha) < 8:
@@ -160,15 +165,15 @@ def redefinir_senha_com_token(token: str, nova_senha: str) -> tuple[bool, str]:
             .from_("usuarios")
             .update({
                 "senha_hash": hashed,
-                "reset_password_token": None,
-                "reset_password_expires": None
+                "reset_password_token": None, # Limpa o token após o uso
+                "reset_password_expires": None # Limpa a expiração
             })
             .eq("id", usuario_id)
             .execute()
         )
 
         if not update_response.data:
-            logger.error(f"Erro ao redefinir senha para {email}")
+            logger.error(f"Erro ao redefinir senha para {email}: {update_response.status_code} - {update_response.text}")
             return False, "Erro ao redefinir senha."
 
         logger.info(f"✅ Senha redefinida com sucesso para {email}")

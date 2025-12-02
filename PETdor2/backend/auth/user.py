@@ -1,18 +1,24 @@
-# PetDor2/auth/user.py
+# PetDor2/backend/auth/user.py
 import logging
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
-# Importações absolutas a partir da raiz do projeto
-from database.supabase_client import (
+# ============================================================
+# 🔧 CORREÇÃO DOS IMPORTS (ABSOLUTOS a partir de 'backend' ou RELATIVOS)
+# ============================================================
+# Importações do novo sistema Supabase (absolutas a partir de 'backend')
+from database.supabase_client import ( # Corrigido: database.supabase_client
     supabase_table_select,
     supabase_table_insert,
     supabase_table_update,
     supabase_table_delete,
 )
-from auth.security import hash_password, verify_password # Nomes corretos das funções de hash
-from utils.validators import validar_email # Para validação de e-mail
-from auth.email_confirmation import enviar_email_confirmacao # Importa a função de envio de e-mail de confirmação
+# Importações relativas dentro do pacote 'auth'
+from .security import hash_password, verify_password # Corrigido: .security
+from .email_confirmation import enviar_email_confirmacao # Corrigido: .email_confirmation
+
+# Importações de 'utils' (absolutas a partir de 'backend')
+from utils.validators import validar_email # Corrigido: utils.validators
 
 logger = logging.getLogger(__name__)
 
@@ -61,62 +67,56 @@ def cadastrar_usuario(
         # 3. Gera hash da senha
         senha_hash = hash_password(senha)
 
-        # 4. Insere o novo usuário no Supabase
+        # 4. Insere usuário no Supabase
         dados_usuario = {
-            "nome": nome.strip(),
-            "email": email.lower(),
+            "nome": nome,
+            "email": email.lower(), # Salva e-mail em minúsculas
             "senha_hash": senha_hash,
-            "tipo": tipo_usuario,  # Coluna 'tipo' no Supabase
+            "tipo": tipo_usuario, # Coluna 'tipo' no Supabase
             "pais": pais,
-            "email_confirmado": False, # Sempre False no cadastro inicial
+            "email_confirmado": False,
             "ativo": True,
-            "is_admin": is_admin, # Define o status de admin
+            "is_admin": is_admin,
             "criado_em": datetime.now().isoformat(),
             "atualizado_em": datetime.now().isoformat()
         }
-
         ok_insert, resultado_insert = supabase_table_insert(TABELA_USUARIOS, dados_usuario)
-
         if not ok_insert or not resultado_insert:
-            logger.error(f"Erro ao salvar usuário {email}: {resultado_insert}")
+            logger.error(f"Erro ao salvar usuário: {resultado_insert}")
             return False, f"Erro ao criar conta: {resultado_insert}"
 
         usuario_criado = resultado_insert[0]
         user_id = usuario_criado["id"]
 
-        # 5. Envia e-mail de confirmação (usando a função de auth.email_confirmation)
+        # 5. Tenta enviar e-mail de confirmação (não crítico para o cadastro em si)
         try:
             # A função enviar_email_confirmacao agora gera o token JWT internamente
-            # e o salva no banco, então só precisamos passar os dados do usuário.
             sucesso_email = enviar_email_confirmacao(email, nome, user_id)
             if not sucesso_email:
-                logger.warning(f"Falha ao enviar email de confirmação para {email}. O usuário foi cadastrado, mas precisa confirmar manualmente.")
+                logger.warning(f"Falha ao enviar email de confirmação para {email}. Continue sem confirmação.")
         except Exception as e:
-            logger.exception(f"Erro inesperado ao tentar enviar email de confirmação para {email}")
+            logger.warning(f"Exceção ao enviar email de confirmação para {email}: {e}")
 
-        logger.info(f"✅ Usuário {email} cadastrado com ID {user_id} no Supabase")
+        logger.info(f"✅ Usuário {email} cadastrado com ID {user_id}")
         return True, "Conta criada com sucesso. Verifique seu e-mail para confirmar."
 
     except Exception as e:
-        logger.exception("Erro geral ao cadastrar usuário no Supabase")
+        logger.exception("Erro inesperado ao cadastrar usuário")
         return False, f"Erro interno ao criar conta: {e}"
 
-
 # =========================
-# Autenticar Usuário
+# Verificação de Credenciais (Login)
 # =========================
-def verificar_credenciais(email: str, senha: str) -> Tuple[bool, str | Dict[str, Any]]:
+def verificar_credenciais(email: str, senha: str) -> Tuple[bool, Any]:
     """
     Verifica credenciais do usuário no Supabase.
-    Retorna (True, user_data_dict) em sucesso ou (False, mensagem de erro) em falha.
+    Retorna (True, user_data_dict) em caso de sucesso ou (False, mensagem de erro).
     """
     try:
+        email = email.strip().lower()
         if not email or not senha:
             return False, "E-mail e senha são obrigatórios."
 
-        email = email.strip().lower()
-
-        # 1. Busca usuário no Supabase
         ok, usuario_db = supabase_table_select(
             TABELA_USUARIOS,
             "id, nome, email, senha_hash, tipo, pais, email_confirmado, ativo, is_admin",
@@ -125,51 +125,48 @@ def verificar_credenciais(email: str, senha: str) -> Tuple[bool, str | Dict[str,
         )
 
         if not ok:
-            logger.error(f"Erro ao buscar usuário {email}: {usuario_db}")
-            return False, "Erro ao buscar usuário."
+            logger.error(f"Erro ao buscar usuário para {email}: {usuario_db}")
+            return False, "Erro interno ao verificar credenciais."
+
         if not usuario_db:
-            return False, "E-mail ou senha incorretos." # Mensagem genérica por segurança
+            # Mensagem genérica para segurança
+            return False, "E-mail ou senha incorretos."
 
-        # 2. Verifica status da conta
+        # Verifica se a conta está ativa
         if not usuario_db.get("ativo"):
-            return False, "Sua conta está desativada. Entre em contato com o suporte."
+            return False, "Sua conta está inativa. Entre em contato com o suporte."
 
-        # Opcional: exigir confirmação de e-mail para login
+        # Verifica se o e-mail foi confirmado (descomente se for obrigatório)
         # if not usuario_db.get("email_confirmado"):
-        #     return False, "Confirme seu e-mail antes de entrar."
+        #     return False, "Por favor, confirme seu e-mail para fazer login."
 
-        # 3. Verifica a senha
-        if not verify_password(senha, usuario_db.get("senha_hash", "")):
-            logger.warning(f"❌ Falha na autenticação para {email} (senha incorreta)")
-            return False, "E-mail ou senha incorretos." # Mensagem genérica por segurança
+        # Verifica a senha
+        if not verify_password(senha, usuario_db["senha_hash"]):
+            return False, "E-mail ou senha incorretos."
 
-        # 4. Login bem-sucedido, retorna dados do usuário
+        logger.info(f"✅ Login bem-sucedido para {email}")
+        # Retorna os dados do usuário (sem o hash da senha)
         user_data = {
             "id": usuario_db["id"],
             "nome": usuario_db["nome"],
             "email": usuario_db["email"],
-            "tipo": usuario_db.get("tipo", "Tutor"), # Garante um valor padrão
-            "pais": usuario_db.get("pais", "Brasil"),
-            "email_confirmado": bool(usuario_db.get("email_confirmado", False)),
-            "ativo": bool(usuario_db.get("ativo", False)),
-            "is_admin": bool(usuario_db.get("is_admin", False)),
+            "tipo": usuario_db["tipo"],
+            "pais": usuario_db["pais"],
+            "email_confirmado": usuario_db["email_confirmado"],
+            "ativo": usuario_db["ativo"],
+            "is_admin": usuario_db["is_admin"],
         }
-        logger.info(f"✅ Usuário {email} autenticado com sucesso (ID: {user_data['id']})")
         return True, user_data
 
     except Exception as e:
-        logger.exception("Erro geral na autenticação no Supabase")
-        return False, f"Erro interno ao autenticar: {e}"
-
+        logger.exception("Erro inesperado ao verificar credenciais")
+        return False, "Erro interno ao verificar credenciais."
 
 # =========================
-# Buscar Usuário por ID
+# Buscar Usuário
 # =========================
 def buscar_usuario_por_id(user_id: int) -> Optional[Dict[str, Any]]:
-    """
-    Busca usuário por ID no Supabase.
-    Retorna dicionário com dados do usuário ou None.
-    """
+    """Busca usuário por ID no Supabase."""
     try:
         ok, usuario_db = supabase_table_select(
             TABELA_USUARIOS,
@@ -179,29 +176,17 @@ def buscar_usuario_por_id(user_id: int) -> Optional[Dict[str, Any]]:
         )
         if not ok or not usuario_db:
             return None
-
-        return {
-            "id": usuario_db["id"],
-            "nome": usuario_db["nome"],
-            "email": usuario_db["email"],
-            "tipo": usuario_db.get("tipo", "Tutor"),
-            "pais": usuario_db.get("pais", "Brasil"),
-            "email_confirmado": bool(usuario_db.get("email_confirmado", False)),
-            "ativo": bool(usuario_db.get("ativo", False)),
-            "is_admin": bool(usuario_db.get("is_admin", False)),
-        }
+        # Garante que booleanos sejam booleanos
+        usuario_db["email_confirmado"] = bool(usuario_db.get("email_confirmado"))
+        usuario_db["ativo"] = bool(usuario_db.get("ativo"))
+        usuario_db["is_admin"] = bool(usuario_db.get("is_admin"))
+        return usuario_db
     except Exception as e:
-        logger.exception(f"Erro ao buscar usuário por ID {user_id} no Supabase")
+        logger.error(f"Erro ao buscar usuário por ID {user_id}: {e}", exc_info=True)
         return None
 
-# =========================
-# Buscar Usuário por Email
-# =========================
 def buscar_usuario_por_email(email: str) -> Optional[Dict[str, Any]]:
-    """
-    Busca usuário por e-mail no Supabase.
-    Retorna dicionário com dados do usuário ou None.
-    """
+    """Busca usuário por e-mail no Supabase."""
     try:
         email = email.strip().lower()
         ok, usuario_db = supabase_table_select(
@@ -212,178 +197,162 @@ def buscar_usuario_por_email(email: str) -> Optional[Dict[str, Any]]:
         )
         if not ok or not usuario_db:
             return None
-
-        return {
-            "id": usuario_db["id"],
-            "nome": usuario_db["nome"],
-            "email": usuario_db["email"],
-            "tipo": usuario_db.get("tipo", "Tutor"),
-            "pais": usuario_db.get("pais", "Brasil"),
-            "email_confirmado": bool(usuario_db.get("email_confirmado", False)),
-            "ativo": bool(usuario_db.get("ativo", False)),
-            "is_admin": bool(usuario_db.get("is_admin", False)),
-        }
+        # Garante que booleanos sejam booleanos
+        usuario_db["email_confirmado"] = bool(usuario_db.get("email_confirmado"))
+        usuario_db["ativo"] = bool(usuario_db.get("ativo"))
+        usuario_db["is_admin"] = bool(usuario_db.get("is_admin"))
+        return usuario_db
     except Exception as e:
-        logger.exception(f"Erro ao buscar usuário por e-mail {email} no Supabase")
+        logger.error(f"Erro ao buscar usuário por e-mail {email}: {e}", exc_info=True)
         return None
 
 # =========================
-# Atualizar Usuário
+# Atualização de Usuário
 # =========================
 def atualizar_usuario(
     user_id: int,
     nome: Optional[str] = None,
     email: Optional[str] = None,
-    tipo: Optional[str] = None, # Renomeado de tipo_usuario para tipo para consistência
+    tipo: Optional[str] = None, # Renomeado de tipo_usuario para tipo
     pais: Optional[str] = None,
-    is_admin: Optional[bool] = None, # Permite atualizar status de admin
-    ativo: Optional[bool] = None, # Permite ativar/desativar
+    email_confirmado: Optional[bool] = None,
+    ativo: Optional[bool] = None,
+    is_admin: Optional[bool] = None,
 ) -> Tuple[bool, str]:
     """
     Atualiza dados do usuário no Supabase.
     Retorna (True, mensagem de sucesso) ou (False, mensagem de erro).
     """
     try:
-        dados_update = {}
-        if nome is not None:
+        dados_update = {"atualizado_em": datetime.now().isoformat()}
+        if nome:
             dados_update["nome"] = nome.strip()
-        if email is not None:
+        if email:
+            if not validar_email(email):
+                return False, "Novo e-mail inválido."
+            # Verifica se o novo e-mail já existe para outro usuário
+            ok, existing_user = supabase_table_select(
+                TABELA_USUARIOS, "id", {"email": email.lower()}, single=True
+            )
+            if ok and existing_user and existing_user["id"] != user_id:
+                return False, "O novo e-mail já está em uso por outro usuário."
             dados_update["email"] = email.strip().lower()
-        if tipo is not None:
+        if tipo:
             dados_update["tipo"] = tipo
-        if pais is not None:
+        if pais:
             dados_update["pais"] = pais
-        if is_admin is not None:
-            dados_update["is_admin"] = is_admin
+        if email_confirmado is not None:
+            dados_update["email_confirmado"] = email_confirmado
         if ativo is not None:
             dados_update["ativo"] = ativo
+        if is_admin is not None:
+            dados_update["is_admin"] = is_admin
 
-        dados_update["atualizado_em"] = datetime.now().isoformat()
-
-        if not dados_update:
-            logger.warning(f"Nenhum campo para atualizar no usuário {user_id}")
-            return True, "Nenhum dado fornecido para atualização."
+        if not dados_update: # Se não há nada para atualizar além do timestamp
+            return False, "Nenhum dado fornecido para atualização."
 
         ok_update, resultado_update = supabase_table_update(
             TABELA_USUARIOS,
             dados_update,
             {"id": user_id}
         )
-
         if ok_update:
-            logger.info(f"✅ Usuário {user_id} atualizado no Supabase")
+            logger.info(f"✅ Usuário {user_id} atualizado com sucesso.")
             return True, "Usuário atualizado com sucesso."
         else:
-            logger.error(f"❌ Falha ao atualizar usuário {user_id}: {resultado_update}")
+            logger.error(f"Erro ao atualizar usuário {user_id}: {resultado_update}")
             return False, f"Erro ao atualizar usuário: {resultado_update}"
-
     except Exception as e:
-        logger.exception(f"Erro ao atualizar usuário {user_id} no Supabase")
+        logger.exception(f"Erro inesperado ao atualizar usuário {user_id}")
         return False, f"Erro interno ao atualizar usuário: {e}"
 
-# =========================
-# Alterar Senha
-# =========================
-def alterar_senha(user_id: int, nova_senha: str) -> Tuple[bool, str]:
+def atualizar_tipo_usuario(user_id: int, novo_tipo: str) -> Tuple[bool, str]:
+    """Atualiza o tipo de usuário (ex: Tutor, Veterinário, Admin)."""
+    return atualizar_usuario(user_id, tipo=novo_tipo)
+
+def atualizar_status_usuario(user_id: int, novo_status: bool) -> Tuple[bool, str]:
+    """Ativa ou desativa a conta do usuário."""
+    return atualizar_usuario(user_id, ativo=novo_status)
+
+def alterar_senha(user_id: int, senha_atual: str, nova_senha: str, confirmar_nova_senha: str) -> Tuple[bool, str]:
     """
-    Altera a senha de um usuário no Supabase.
-    Retorna (True, mensagem de sucesso) ou (False, mensagem de erro).
+    Permite ao usuário alterar sua própria senha, exigindo a senha atual.
     """
     try:
+        if not senha_atual or not nova_senha or not confirmar_nova_senha:
+            return False, "Preencha todos os campos de senha."
+        if nova_senha != confirmar_nova_senha:
+            return False, "A nova senha e a confirmação não coincidem."
         if len(nova_senha) < 8:
             return False, "A nova senha deve ter pelo menos 8 caracteres."
 
-        senha_hash = hash_password(nova_senha)
-        dados_update = {
-            "senha_hash": senha_hash,
-            "atualizado_em": datetime.now().isoformat()
-        }
+        # 1. Busca a senha hash atual do usuário
+        ok, usuario_db = supabase_table_select(
+            TABELA_USUARIOS, "senha_hash", {"id": user_id}, single=True
+        )
+        if not ok or not usuario_db:
+            return False, "Usuário não encontrado ou erro ao buscar senha."
 
+        # 2. Verifica se a senha atual fornecida está correta
+        if not verify_password(senha_atual, usuario_db["senha_hash"]):
+            return False, "Senha atual incorreta."
+
+        # 3. Gera hash da nova senha e atualiza
+        nova_senha_hash = hash_password(nova_senha)
         ok_update, resultado_update = supabase_table_update(
             TABELA_USUARIOS,
-            dados_update,
+            {"senha_hash": nova_senha_hash, "atualizado_em": datetime.now().isoformat()},
             {"id": user_id}
         )
-
         if ok_update:
-            logger.info(f"✅ Senha alterada para usuário {user_id}")
+            logger.info(f"✅ Senha do usuário {user_id} alterada com sucesso.")
             return True, "Senha alterada com sucesso."
         else:
-            logger.error(f"❌ Falha ao alterar senha para usuário {user_id}: {resultado_update}")
+            logger.error(f"Erro ao alterar senha do usuário {user_id}: {resultado_update}")
             return False, f"Erro ao alterar senha: {resultado_update}"
-
     except Exception as e:
-        logger.exception(f"Erro ao alterar senha para usuário {user_id} no Supabase")
+        logger.exception(f"Erro inesperado ao alterar senha do usuário {user_id}")
         return False, f"Erro interno ao alterar senha: {e}"
 
 # =========================
-# Deletar/Desativar Usuário
+# Deleção de Usuário
 # =========================
 def deletar_usuario(user_id: int) -> Tuple[bool, str]:
     """
-    Desativa um usuário no Supabase (não remove fisicamente).
+    Deleta um usuário do Supabase.
     Retorna (True, mensagem de sucesso) ou (False, mensagem de erro).
     """
     try:
-        dados_update = {
-            "ativo": False,
-            "atualizado_em": datetime.now().isoformat()
-        }
-        ok_update, resultado_update = supabase_table_update(
-            TABELA_USUARIOS,
-            dados_update,
-            {"id": user_id}
-        )
-        if ok_update:
-            logger.info(f"✅ Usuário {user_id} desativado no Supabase")
-            return True, "Usuário desativado com sucesso."
+        ok_delete, resultado_delete = supabase_table_delete(TABELA_USUARIOS, {"id": user_id})
+        if ok_delete:
+            logger.info(f"✅ Usuário {user_id} deletado com sucesso.")
+            return True, "Usuário deletado com sucesso."
         else:
-            logger.error(f"❌ Falha ao desativar usuário {user_id}: {resultado_update}")
-            return False, f"Erro ao desativar usuário: {resultado_update}"
+            logger.error(f"Erro ao deletar usuário {user_id}: {resultado_delete}")
+            return False, f"Erro ao deletar usuário: {resultado_delete}"
     except Exception as e:
-        logger.exception(f"Erro ao desativar usuário {user_id} no Supabase")
-        return False, f"Erro interno ao desativar usuário: {e}"
+        logger.exception(f"Erro inesperado ao deletar usuário {user_id}")
+        return False, f"Erro interno ao deletar usuário: {e}"
 
-# =========================
-# Marcar E-mail como Confirmado
-# =========================
-def marcar_email_como_confirmado(user_id: int) -> Tuple[bool, str]:
+# Funções de compatibilidade (mantidas para evitar quebras em outros módulos)
+def marcar_email_como_confirmado(email: str) -> Tuple[bool, str]:
     """
-    Marca o e-mail de um usuário como confirmado no Supabase e remove o token.
-    Retorna (True, mensagem de sucesso) ou (False, mensagem de erro).
+    Marca e-mail como confirmado no Supabase e remove o token de confirmação.
+    Esta função é chamada por auth.email_confirmation.confirmar_email_com_token.
     """
     try:
         dados_update = {
             "email_confirmado": True,
-            "email_confirm_token": None, # Remove o token após a confirmação
+            "email_confirm_token": None,  # Remove o token após a confirmação
             "atualizado_em": datetime.now().isoformat()
         }
-        ok_update, resultado_update = supabase_table_update(
-            TABELA_USUARIOS,
-            dados_update,
-            {"id": user_id}
-        )
-        if ok_update:
-            logger.info(f"✅ E-mail confirmado para usuário {user_id}")
+        ok, _ = supabase_table_update(TABELA_USUARIOS, dados_update, {"email": email.lower()})
+        if ok:
+            logger.info(f"✅ E-mail {email} marcado como confirmado.")
             return True, "E-mail confirmado com sucesso."
         else:
-            logger.error(f"❌ Falha ao marcar e-mail como confirmado para usuário {user_id}: {resultado_update}")
-            return False, f"Erro ao confirmar e-mail: {resultado_update}"
+            return False, "Falha ao marcar e-mail como confirmado."
     except Exception as e:
-        logger.exception(f"Erro ao marcar e-mail como confirmado para usuário {user_id} no Supabase")
+        logger.exception(f"Erro ao marcar e-mail {email} como confirmado")
         return False, f"Erro interno ao confirmar e-mail: {e}"
 
-# =========================
-# Funções de compatibilidade (para uso em outros módulos)
-# =========================
-def atualizar_tipo_usuario(user_id: int, novo_tipo: str) -> Tuple[bool, str]:
-    """Atualiza o tipo de usuário no Supabase."""
-    return atualizar_usuario(user_id, tipo=novo_tipo)
-
-def atualizar_status_usuario(user_id: int, novo_status: bool) -> Tuple[bool, str]:
-    """Atualiza o status (ativo/inativo) do usuário no Supabase."""
-    return atualizar_usuario(user_id, ativo=novo_status)
-
-# Removida a função 'redefinir_senha' pois a lógica está em auth.password_reset.py
-# Removida a função 'gerar_token_confirmacao_para_usuario' pois a lógica está em auth.email_confirmation.py
-# Removida a função 'confirmar_email' pois a lógica está em auth.email_confirmation.py

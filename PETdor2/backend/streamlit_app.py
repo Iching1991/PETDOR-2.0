@@ -13,54 +13,63 @@ logger = logging.getLogger(__name__)
 # ===============================
 # Ajuste do sys.path para imports absolutos
 # ===============================
-# Adiciona o diretório raiz do projeto (PetDor2/) ao sys.path
+# Adiciona o diretório raiz do projeto (PETdor2/) ao sys.path
+# Isso permite importar módulos como 'backend.auth.user' ou 'backend.pages.login'
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 # ===============================
-# Importações absolutas a partir da raiz do projeto (PETdor2/)
+# Importações absolutas a partir do pacote 'backend'
 # ===============================
-from backend.database.supabase_client import testar_conexao
-from backend.auth import ( # Importa tudo do __init__.py do pacote auth
+# Módulos de Banco de Dados
+from backend.database import testar_conexao # Corrigido: Importa do pacote database
+
+# Módulos de Autenticação e Usuário
+from backend.auth.user import (
     cadastrar_usuario,
     verificar_credenciais,
+    buscar_usuario_por_email,
     buscar_usuario_por_id,
+)
+from backend.auth.password_reset import (
     solicitar_reset_senha,
     redefinir_senha_com_token,
-    confirmar_email_com_token,
-    usuario_logado,
-    logout,
-    validar_token_reset_senha, # Importa a função de validação de token de reset
 )
+from backend.auth.email_confirmation import confirmar_email_com_token
+from backend.auth.security import usuario_logado, logout, validar_token_reset_senha
+
+# Módulos de Páginas
 from backend.pages.login import render as login_app_render
 from backend.pages.cadastro import render as cadastro_app_render
 from backend.pages.cadastro_pet import render as cadastro_pet_app_render
 from backend.pages.avaliacao import render as avaliacao_app_render
 from backend.pages.admin import render as admin_app_render
 from backend.pages.home import render as home_app_render
+
+# Módulos de Utilitários
 from backend.utils.config import APP_CONFIG, STREAMLIT_APP_URL
 
 # ===============================
-# Configuração da Página Streamlit
+# Configurações Iniciais do Streamlit
 # ===============================
-st.set_page_config(page_title=APP_CONFIG["PAGE_TITLE"], layout=APP_CONFIG["LAYOUT"])
-st.title(APP_CONFIG["APP_TITLE"])
+st.set_page_config(
+    page_title="PETDor - Avaliação de Dor Animal",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 # ===============================
-# Inicialização do Supabase e Migrações
+# Inicialização e Teste de Conexão com Supabase
 # ===============================
-if "db_initialized" not in st.session_state:
-    st.session_state.db_initialized = False
+if "db_connected" not in st.session_state:
+    st.session_state.db_connected = False
 
-if not st.session_state.db_initialized:
+if not st.session_state.db_connected:
     with st.spinner("Conectando ao banco de dados..."):
         if testar_conexao():
-            st.success("✅ Conexão com Supabase estabelecida!")
-            # Aqui você pode chamar migrações de colunas se tiver alguma específica para Supabase
-            # from backend.database.migrations import migrar_colunas_desativacao
-            # migrar_colunas_desativacao() # Se esta função for para Supabase
-            st.session_state.db_initialized = True
+            st.session_state.db_connected = True
+            logger.info("✅ Conexão com Supabase estabelecida com sucesso.")
         else:
             st.error("❌ Falha ao conectar ao Supabase. Verifique as variáveis de ambiente.")
             st.stop() # Para a execução se não conseguir conectar
@@ -190,4 +199,3 @@ else:
         # Caso padrão para evitar estado vazio
         st.session_state.page = "Login"
         login_app_render()
-

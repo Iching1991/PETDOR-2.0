@@ -1,10 +1,10 @@
-# PetDor2/database/__init__.py
+# PetDor2/backend/database/__init__.py
 """
-Módulo de inicialização do pacote database.
-Exporta funções para interação com o Supabase.
+Camada de acesso a dados usando Supabase.
+Exponha aqui apenas o que for realmente usado pelo resto do app.
 """
 
-# Importa e reexporta as funções do cliente Supabase
+# Importa todas as funções do supabase_client.py e as expõe diretamente
 from .supabase_client import (
     get_supabase,
     testar_conexao,

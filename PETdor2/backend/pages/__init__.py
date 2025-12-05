@@ -1,19 +1,20 @@
 """
 Pacote de páginas da aplicação PETDor2.
-
-Centraliza todas as páginas do Streamlit,
-evitando importações circulares e facilitando organização.
+Organiza e disponibiliza todas as páginas do Streamlit.
 """
 
-# Importações explícitas dos módulos
 from . import login
 from . import cadastro
 from . import cadastro_pet
 from . import avaliacao
 from . import admin
 from . import home
+from . import confirmar_email
+from . import conta
+from . import historico
+from . import password_reset
+from . import recuperar_senha
 
-# Quais páginas estão disponíveis publicamente
 __all__ = [
     "login",
     "cadastro",
@@ -21,4 +22,9 @@ __all__ = [
     "avaliacao",
     "admin",
     "home",
+    "confirmar_email",
+    "conta",
+    "historico",
+    "password_reset",
+    "recuperar_senha",
 ]

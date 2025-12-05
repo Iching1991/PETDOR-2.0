@@ -1,8 +1,10 @@
 # PETdor2/especies/__init__.py
+
 """
 Pacote de espécies - configurações de avaliação de dor por tipo animal.
 Gerencia o registro dinâmico de espécies e suas escalas de avaliação.
 """
+
 from .base import EspecieConfig, Pergunta
 from .index import (
     registrar_especie,
@@ -23,5 +25,3 @@ __all__ = [
     "get_especies_ids",
     "get_escala_labels",
 ]
-
-

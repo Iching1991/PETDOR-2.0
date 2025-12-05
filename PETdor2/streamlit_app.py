@@ -27,7 +27,7 @@ if BASE_DIR not in sys.path:
 # ========================================================
 
 # Banco de Dados
-from backend.database import testar_conexao
+from PETdor2.backend.database import testar_conexao
 
 # Autenticação
 from backend.auth.user import (

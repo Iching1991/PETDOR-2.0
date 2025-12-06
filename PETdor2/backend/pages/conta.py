@@ -3,19 +3,25 @@
 Página de gerenciamento de conta do usuário.
 Permite atualizar dados pessoais, redefinir senha e gerenciar preferências.
 """
+
 import streamlit as st
 import logging
-from auth.user import (
+
+# 🔧 Imports absolutos
+from backend.auth.user import (
     buscar_usuario_por_email,
     redefinir_senha,
     atualizar_status_usuario,
 )
-from database.supabase_client import get_supabase
+from backend.database.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
 
+# ==========================================================
+# Funções de banco
+# ==========================================================
 def atualizar_dados_usuario(user_id: int, nome: str, email: str) -> bool:
-    """Atualiza nome e email do usuário no banco."""
+    """Atualiza nome e email do usuário no Supabase."""
     try:
         supabase = get_supabase()
         supabase.from_("usuarios").update({
@@ -28,10 +34,13 @@ def atualizar_dados_usuario(user_id: int, nome: str, email: str) -> bool:
         logger.error(f"Erro ao atualizar dados: {e}")
         return False
 
+# ==========================================================
+# Renderização
+# ==========================================================
 def render():
-    """Renderiza a página de conta do usuário."""
     st.header("👤 Minha Conta")
     usuario = st.session_state.get("usuario")
+
     if not usuario:
         st.warning("⚠️ Você precisa estar logado para acessar esta página.")
         st.stop()
@@ -44,7 +53,9 @@ def render():
     # Abas
     tab1, tab2, tab3 = st.tabs(["📋 Dados Pessoais", "🔐 Segurança", "⚙️ Preferências"])
 
+    # ------------------------------------------------------
     # ABA 1: Dados Pessoais
+    # ------------------------------------------------------
     with tab1:
         st.subheader("📋 Dados Pessoais")
         col1, col2 = st.columns(2)
@@ -68,7 +79,9 @@ def render():
             else:
                 st.warning("⚠️ Preencha todos os campos.")
 
+    # ------------------------------------------------------
     # ABA 2: Segurança
+    # ------------------------------------------------------
     with tab2:
         st.subheader("🔐 Segurança")
         st.write("**Alterar Senha**")
@@ -88,18 +101,24 @@ def render():
             elif len(nova_senha) < 8:
                 st.error("❌ A senha deve ter pelo menos 8 caracteres.")
             else:
-                sucesso, mensagem = redefinir_senha(usuario_id, senha_atual, nova_senha)
-                if sucesso:
-                    st.success(f"✅ {mensagem}")
-                else:
-                    st.error(f"❌ {mensagem}")
+                try:
+                    sucesso, mensagem = redefinir_senha(usuario_id, senha_atual, nova_senha)
+                    if sucesso:
+                        st.success(f"✅ {mensagem}")
+                    else:
+                        st.error(f"❌ {mensagem}")
+                except Exception as e:
+                    st.error(f"❌ Erro inesperado: {e}")
+                    logger.exception(f"Erro ao redefinir senha para usuario_id={usuario_id}")
 
         st.divider()
         st.write("**Recuperação de Conta**")
         if st.button("📧 Enviar link de recuperação", key="btn_recovery"):
             st.info("📧 Link de recuperação enviado para seu e-mail.")
 
+    # ------------------------------------------------------
     # ABA 3: Preferências
+    # ------------------------------------------------------
     with tab3:
         st.subheader("⚙️ Preferências")
         notificacoes = st.checkbox("Receber notificações por e-mail", value=True)

@@ -2,6 +2,7 @@
 """
 Sistema central de registro e consulta das espécies e suas configurações.
 """
+
 import logging
 from typing import Dict, List, Optional
 from .base import EspecieConfig, Pergunta
@@ -34,21 +35,26 @@ def registrar_especie(config):
     _ESPECIES_REGISTRADAS[especie_id] = config
     logger.info(f"✅ Espécie '{config.get('nome')}' registrada com sucesso")
 
+
 def buscar_especie_por_id(especie_id: str) -> Optional[dict]:
     """Retorna a configuração completa da espécie."""
     return _ESPECIES_REGISTRADAS.get(especie_id)
+
 
 def listar_especies() -> List[dict]:
     """Lista todas as espécies registradas."""
     return list(_ESPECIES_REGISTRADAS.values())
 
+
 def get_especies_nomes() -> List[str]:
     """Retorna somente os nomes das espécies registradas."""
     return [config["nome"] for config in _ESPECIES_REGISTRADAS.values()]
 
+
 def get_especies_ids() -> List[str]:
     """Retorna somente os IDs das espécies registradas."""
     return list(_ESPECIES_REGISTRADAS.keys())
+
 
 def get_escala_labels(escala: str) -> List[str]:
     """
@@ -69,47 +75,40 @@ def get_escala_labels(escala: str) -> List[str]:
             raise ValueError(f"Escala desconhecida: {escala}")
     raise ValueError(f"Escala desconhecida: {escala}")
 
+
+# ==========================================================
+# Função para Streamlit carregar espécies
+# ==========================================================
+def carregar_especies():
+    """
+    Retorna todas as espécies registradas.
+    Para uso na interface do Streamlit.
+    """
+    return listar_especies()
+
+
 # ==========================================================
 # Importar e registrar automaticamente todas as espécies
 # ==========================================================
 
-try:
-    from .cao import CONFIG_CAES
-    registrar_especie(CONFIG_CAES)
-except Exception as e:
-    logger.error(f"❌ Erro ao registrar cães: {e}")
+ESPECIES_IMPORTS = {
+    "cao": "CONFIG_CAES",
+    "gato": "CONFIG_GATOS",
+    "coelho": "CONFIG_COELHO",
+    "porquinho": "CONFIG_PORQUINHO",
+    "aves": "CONFIG_AVES",
+    "repteis": "CONFIG_REPTEIS"
+}
 
-try:
-    from .gato import CONFIG_GATOS
-    registrar_especie(CONFIG_GATOS)
-except Exception as e:
-    logger.error(f"❌ Erro ao registrar gatos: {e}")
-
-try:
-    from .coelho import CONFIG_COELHO
-    registrar_especie(CONFIG_COELHO)
-except Exception as e:
-    logger.error(f"❌ Erro ao registrar coelhos: {e}")
-
-try:
-    from .porquinho import CONFIG_PORQUINHO
-    registrar_especie(CONFIG_PORQUINHO)
-except Exception as e:
-    logger.error(f"❌ Erro ao registrar porquinhos: {e}")
-
-try:
-    from .aves import CONFIG_AVES
-    registrar_especie(CONFIG_AVES)
-except Exception as e:
-    logger.error(f"❌ Erro ao registrar aves: {e}")
-
-try:
-    from .repteis import CONFIG_REPTEIS
-    registrar_especie(CONFIG_REPTEIS)
-except Exception as e:
-    logger.error(f"❌ Erro ao registrar répteis: {e}")
+for modulo, config_attr in ESPECIES_IMPORTS.items():
+    try:
+        mod = __import__(f".{modulo}", globals(), locals(), [config_attr])
+        registrar_especie(getattr(mod, config_attr))
+    except Exception as e:
+        logger.error(f"❌ Erro ao registrar {modulo}: {e}")
 
 logger.info(f"✅ Total de espécies registradas: {len(_ESPECIES_REGISTRADAS)}")
+
 
 __all__ = [
     "EspecieConfig",
@@ -120,4 +119,5 @@ __all__ = [
     "get_especies_nomes",
     "get_especies_ids",
     "get_escala_labels",
+    "carregar_especies",
 ]

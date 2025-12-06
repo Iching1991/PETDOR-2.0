@@ -1,4 +1,5 @@
 """
-Pacote raiz do projeto PetDor2.
-Permite importar módulos internos como backend e frontend.
+Pacote principal do PETdor2.
+Arquivo mantido minimalista para evitar imports automáticos.
 """
+__all__ = []

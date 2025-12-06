@@ -1,5 +1,18 @@
 """
-Utils do PETDOR
+Pacote utilitário do PETDor2.
+Expondo funções e helpers gerais.
 """
-# Não importar nada automaticamente aqui.
-# Importações diretas nos arquivos evitarão ciclos.
+
+from .petdor import *
+from .validators import *
+from .notifications import *
+from .utils import *
+from .config import *
+
+__all__ = [
+    "petdor",
+    "validators",
+    "notifications",
+    "utils",
+    "config",
+]

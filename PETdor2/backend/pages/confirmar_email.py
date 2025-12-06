@@ -3,26 +3,32 @@
 Página de confirmação de e-mail após registro.
 O usuário recebe um link com token e confirma seu e-mail aqui.
 """
+
 import streamlit as st
 import logging
-from auth.email_confirmation import validar_token_confirmacao, confirmar_email
+
+# 🔧 Imports absolutos do backend
+from backend.auth.email_confirmation import validar_token_confirmacao, confirmar_email
 
 logger = logging.getLogger(__name__)
 
-def get_query_params():
+# ==========================================================
+# Helpers
+# ==========================================================
+def get_query_params() -> dict:
     """Lê parâmetros da URL de forma compatível com todas as versões do Streamlit."""
     try:
-        # Streamlit 1.30+
         return st.query_params
     except Exception:
-        # Versões antigas (experimental)
         return st.experimental_get_query_params()
 
+# ==========================================================
+# Renderização
+# ==========================================================
 def render():
-    """Renderiza a página de confirmação de e-mail."""
     st.header("📧 Confirmar E-mail")
 
-    # Obtém token da URL (compatível com todas as versões)
+    # Obtém token da URL
     query_params = get_query_params()
     token = query_params.get("token", [None])[0]
 
@@ -40,16 +46,19 @@ def render():
         return
 
     # Token válido - confirma e-mail
-    sucesso, mensagem = confirmar_email(usuario_id)
+    try:
+        sucesso, mensagem = confirmar_email(usuario_id)
+        if sucesso:
+            st.success("✅ E-mail confirmado com sucesso!")
+            st.info("Você já pode fazer login na plataforma.")
+            if st.button("🔐 Ir para Login"):
+                st.session_state.pagina = "login"
+                st.rerun()
+        else:
+            st.error(f"❌ Erro ao confirmar e-mail: {mensagem}")
 
-    if sucesso:
-        st.success("✅ E-mail confirmado com sucesso!")
-        st.info("Você já pode fazer login na plataforma.")
-
-        if st.button("🔐 Ir para Login"):
-            st.session_state.pagina = "login"
-            st.rerun()
-    else:
-        st.error(f"❌ Erro ao confirmar e-mail: {mensagem}")
+    except Exception as e:
+        st.error(f"❌ Erro inesperado ao confirmar e-mail: {e}")
+        logger.exception(f"Erro inesperado ao confirmar e-mail para usuario_id={usuario_id}")
 
 __all__ = ["render"]

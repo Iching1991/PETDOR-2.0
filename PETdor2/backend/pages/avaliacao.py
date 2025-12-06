@@ -1,19 +1,27 @@
-# PETdor2/pages/avaliacao.py
+"""
+Página de avaliação de dor - PETDor2
+Permite que usuários logados avaliem a dor de seus pets com base na espécie.
+"""
+
 import streamlit as st
 from datetime import datetime
 import json
 import logging
+from typing import List, Dict
 
-from database.supabase_client import supabase
-from especies.index import (
-    get_especies_nomes,
-    buscar_especie_por_id,
-    get_escala_labels
-)
+# ============================================================
+# 🔧 IMPORTS ABSOLUTOS (a partir do pacote backend)
+# ============================================================
+from backend.database.supabase_client import supabase
+from backend.especies.index import get_especies_nomes, buscar_especie_por_id, get_escala_labels
 
 logger = logging.getLogger(__name__)
 
-def carregar_pets_do_usuario(usuario_id: int) -> list[dict]:
+# ============================================================
+# Funções de acesso a dados
+# ============================================================
+
+def carregar_pets_do_usuario(usuario_id: int) -> List[Dict]:
     """Retorna todos os pets cadastrados pelo usuário via Supabase."""
     try:
         response = (
@@ -24,6 +32,7 @@ def carregar_pets_do_usuario(usuario_id: int) -> list[dict]:
             .order("nome", desc=False)
             .execute()
         )
+        # Compatibilidade com versões de response diferentes
         pets = getattr(response, "data", None) or (response.get("data") if isinstance(response, dict) else None)
         return pets or []
     except Exception as e:
@@ -42,11 +51,15 @@ def salvar_avaliacao(pet_id: int, usuario_id: int, especie: str, respostas_json:
             "pontuacao_total": pontuacao_total,
             "criado_em": datetime.utcnow().isoformat()
         }
-        response = supabase.table("avaliacoes").insert(payload).execute()
+        supabase.table("avaliacoes").insert(payload).execute()
         logger.info(f"✅ Avaliação salva com sucesso para pet_id={pet_id}")
     except Exception as e:
         logger.error(f"Erro ao salvar avaliação: {e}")
         raise RuntimeError(f"Erro ao salvar avaliação: {e}")
+
+# ============================================================
+# Função principal de renderização
+# ============================================================
 
 def render():
     """Renderiza a página de avaliação de dor."""
@@ -59,7 +72,9 @@ def render():
 
     usuario_id = usuario["id"]
 
+    # ==============================
     # Seleção do PET
+    # ==============================
     st.subheader("🐾 Selecione o Pet")
     pets = carregar_pets_do_usuario(usuario_id)
 
@@ -84,12 +99,14 @@ def render():
         st.error(f"⚠ A espécie '{especie}' não possui escala configurada.")
         return
 
+    # ==============================
+    # Loop de avaliação
+    # ==============================
     st.subheader(f"🐶 Avaliação para espécie: **{especie_cfg['nome']}**")
     categorias = especie_cfg.get("categorias", [])
-    respostas = {}
+    respostas: Dict[str, str] = {}
     pontuacao_total = 0
 
-    # Loop das categorias e perguntas
     for categoria in categorias:
         st.markdown(f"### 🔹 {categoria['nome']}")
         for pergunta in categoria.get("perguntas", []):
@@ -105,7 +122,9 @@ def render():
 
     st.markdown(f"## 🧮 Pontuação Total: **{pontuacao_total}**")
 
-    # Botão para salvar a avaliação
+    # ==============================
+    # Botão para salvar
+    # ==============================
     if st.button("💾 Salvar Avaliação"):
         respostas_json = json.dumps(respostas, ensure_ascii=False)
         try:
@@ -113,3 +132,5 @@ def render():
             st.success("✅ Avaliação salva com sucesso!")
         except Exception as e:
             st.error(f"❌ Erro ao salvar avaliação: {e}")
+
+__all__ = ["render"]

@@ -1,10 +1,7 @@
 # PetDor2/streamlit_app.py
 import streamlit as st
 
-# Importações do backend
-# Como o backend está dentro do pacote PetDor2/backend,
-# e este arquivo está em PetDor2/, usamos:
-# from backend...  (pois streamlit_app.py e backend/ estão no mesmo nível)
+# Backend
 from backend.database import testar_conexao
 from backend.especies.index import carregar_especies
 from backend.pages.home import render_home
@@ -34,8 +31,10 @@ menu = st.sidebar.selectbox(
 
 with st.sidebar:
     st.write("### 🔌 Status da Conexão")
-    status = testar_conexao()
-    if status:
+
+    conectado = testar_conexao()
+
+    if conectado:
         st.success("Conectado ao Supabase!")
     else:
         st.error("Falha ao conectar ao Supabase")
@@ -57,3 +56,4 @@ elif menu == "🐾 Espécies":
 
 elif menu == "ℹ️ Sobre":
     render_sobre()
+

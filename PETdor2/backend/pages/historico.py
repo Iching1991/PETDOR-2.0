@@ -3,19 +3,25 @@
 Página de histórico de avaliações do pet.
 Exibe todas as avaliações realizadas pelo usuário logado.
 """
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime
 import logging
-from database.supabase_client import get_supabase
+import json
+
+# 🔧 Imports absolutos
+from backend.database.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
 
-def buscar_avaliacoes_usuario(usuario_id: int) -> list:
-    """Busca todas as avaliações de um usuário."""
+# ==========================================================
+# Funções de banco
+# ==========================================================
+def buscar_avaliacoes_usuario(usuario_id: int) -> list[dict]:
+    """Busca todas as avaliações de um usuário e adiciona informações dos pets."""
     try:
         supabase = get_supabase()
-
         response = (
             supabase
             .from_("avaliacoes")
@@ -24,58 +30,40 @@ def buscar_avaliacoes_usuario(usuario_id: int) -> list:
             .order("data_avaliacao", desc=True)
             .execute()
         )
-
         avaliacoes = response.data if response.data else []
 
-        # Busca informações dos pets
         for aval in avaliacoes:
             try:
-                pet_response = (
-                    supabase
-                    .from_("pets")
-                    .select("nome, especie")
-                    .eq("id", aval["pet_id"])
-                    .single()
-                    .execute()
-                )
-                aval["pet_nome"] = pet_response.data.get("nome", "Desconhecido")
-                aval["pet_especie"] = pet_response.data.get("especie", "Desconhecida")
+                pet_resp = supabase.from_("pets").select("nome, especie").eq("id", aval["pet_id"]).single().execute()
+                aval["pet_nome"] = pet_resp.data.get("nome", "Desconhecido")
+                aval["pet_especie"] = pet_resp.data.get("especie", "Desconhecida")
             except Exception as e:
-                logger.warning(f"Erro ao buscar pet {aval['pet_id']}: {e}")
+                logger.warning(f"Erro ao buscar pet {aval.get('pet_id')}: {e}")
                 aval["pet_nome"] = "Desconhecido"
                 aval["pet_especie"] = "Desconhecida"
 
         return avaliacoes
-
     except Exception as e:
-        logger.error(f"Erro ao buscar avaliações: {e}")
+        logger.exception(f"Erro ao buscar avaliações para usuario_id={usuario_id}")
         return []
 
 def deletar_avaliacao(avaliacao_id: int) -> tuple[bool, str]:
     """Deleta uma avaliação do banco de dados."""
     try:
         supabase = get_supabase()
-
-        response = (
-            supabase
-            .from_("avaliacoes")
-            .delete()
-            .eq("id", avaliacao_id)
-            .execute()
-        )
-
+        supabase.from_("avaliacoes").delete().eq("id", avaliacao_id).execute()
         logger.info(f"✅ Avaliação {avaliacao_id} deletada com sucesso")
         return True, "✅ Avaliação deletada com sucesso!"
-
     except Exception as e:
-        logger.error(f"Erro ao deletar avaliação: {e}")
+        logger.exception(f"Erro ao deletar avaliação {avaliacao_id}")
         return False, f"❌ Erro ao deletar avaliação: {e}"
 
+# ==========================================================
+# Renderização
+# ==========================================================
 def render():
-    """Renderiza a página de histórico de avaliações."""
     st.header("📊 Histórico de Avaliações")
 
-    # Verifica se usuário está logado
     usuario = st.session_state.get("usuario")
     if not usuario:
         st.warning("⚠️ Faça login para acessar seu histórico.")
@@ -83,8 +71,6 @@ def render():
         st.stop()
 
     usuario_id = usuario.get("id")
-
-    # Busca avaliações
     avaliacoes = buscar_avaliacoes_usuario(usuario_id)
 
     if not avaliacoes:
@@ -107,31 +93,24 @@ def render():
         try:
             data_obj = pd.to_datetime(data)
             data_formatada = data_obj.strftime("%d/%m/%Y %H:%M")
-        except:
+        except Exception:
             data_formatada = str(data)
 
-        # Card expansível
         with st.expander(f"🐾 {pet_nome} — {pet_esp} — {data_formatada} — Dor: {dor}%"):
             col1, col2 = st.columns(2)
-
             with col1:
                 st.write(f"📅 **Data:** {data_formatada}")
                 st.write(f"🐾 **Pet:** {pet_nome}")
                 st.write(f"🏷️ **Espécie:** {pet_esp}")
-
             with col2:
-                # Barra de progresso para dor
                 st.write(f"🔥 **Percentual de Dor:** {dor}%")
                 st.progress(dor / 100)
 
             st.divider()
-
             st.write("📝 **Observações:**")
             st.write(obs if obs else "_Nenhuma observação registrada._")
 
             st.divider()
-
-            # Botões de ação
             col_delete, col_export = st.columns(2)
 
             with col_delete:
@@ -144,8 +123,6 @@ def render():
                         st.error(mensagem)
 
             with col_export:
-                # Exportar como JSON
-                import json
                 json_data = json.dumps({
                     "id": aval_id,
                     "pet": f"{pet_nome} ({pet_esp})",
@@ -165,16 +142,12 @@ def render():
     # Resumo geral
     st.divider()
     st.subheader("📈 Resumo Geral")
-
     col1, col2, col3 = st.columns(3)
-
     with col1:
         st.metric("Total de Avaliações", len(avaliacoes))
-
     with col2:
         dor_media = sum(a.get("percentual_dor", 0) for a in avaliacoes) / len(avaliacoes)
         st.metric("Dor Média", f"{dor_media:.1f}%")
-
     with col3:
         dor_maxima = max(a.get("percentual_dor", 0) for a in avaliacoes)
         st.metric("Dor Máxima Registrada", f"{dor_maxima}%")

@@ -10,7 +10,7 @@ from typing import Tuple, Dict, Any, Optional
 # Importações absolutas a partir do pacote 'backend'
 # Ajustado para os nomes das funções que definimos em auth.security
 from .security import gerar_token_reset_senha, validar_token_reset_senha, hash_password
-from utils.email_sender import enviar_email_recuperacao_senha
+from backend.utils.email_sender import enviar_email_recuperacao_senha
 from database.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
@@ -188,4 +188,5 @@ __all__ = [
     "validar_token_reset",
     "redefinir_senha_com_token",
 ]
+
 

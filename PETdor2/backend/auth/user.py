@@ -1,147 +1,198 @@
-# PetDor2/backend/auth/security.py
+# PetDor2/backend/auth/user.py
 """
-Módulo de segurança do PETDor:
-- hash e verificação de senha (bcrypt)
-- geração e validação de JWT (PyJWT)
-- helpers para tokens específicos (reset de senha, confirmação de e-mail)
-- helpers de sessão para Streamlit (usuario_logado, logout)
+Funções de usuário: cadastro, autenticação, busca e atualização.
+Usa API genérica do supabase_client (supabase_table_*).
 """
 
-import os
 import logging
-from typing import Optional, Dict, Any
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
+from typing import Any, Dict, Optional, Tuple
 
-import bcrypt
-import jwt
+from backend.database.supabase_client import (
+    supabase_table_select,
+    supabase_table_insert,
+    supabase_table_update,
+    supabase_table_delete,
+)
+from backend.auth.security import hash_password, verify_password
+from backend.utils.validators import validar_email
 
 logger = logging.getLogger(__name__)
 
-# Leitura segura da chave: preferir secrets do Streamlit / .env em produção
-SECRET_KEY = os.getenv("SECRET_KEY", "troque_esta_chave_em_producao")
-ALGORITHM = "HS256"
+TABELA_USUARIOS = "usuarios"
 
 
-# ---------------------------
-# Hashing de senha (bcrypt)
-# ---------------------------
-def hash_password(senha: str) -> str:
-    """Gera hash bcrypt da senha (utf-8)."""
-    if senha is None:
-        raise ValueError("Senha não pode ser None")
-    hashed = bcrypt.hashpw(senha.encode("utf-8"), bcrypt.gensalt())
-    return hashed.decode("utf-8")
-
-
-def verify_password(senha: str, senha_hash: str) -> bool:
-    """Verifica senha contra hash (retorna False em erro)."""
+def cadastrar_usuario(
+    nome: str,
+    email: str,
+    senha: str,
+    tipo_usuario: str = "Tutor",
+    pais: str = "Brasil",
+    confirmar_senha: Optional[str] = None,
+    is_admin: bool = False,
+) -> Tuple[bool, str]:
+    """
+    Cadastra um novo usuário.
+    Compatível tanto com chamadas que enviam confirmar_senha quanto com as que não enviam.
+    """
     try:
-        return bcrypt.checkpw(senha.encode("utf-8"), senha_hash.encode("utf-8"))
+        if not nome or not email or not senha:
+            return False, "Preencha todos os campos obrigatórios."
+
+        if confirmar_senha is not None and senha != confirmar_senha:
+            return False, "As senhas não conferem."
+
+        if not validar_email(email):
+            return False, "E-mail inválido."
+
+        if len(senha) < 8:
+            return False, "A senha deve ter pelo menos 8 caracteres."
+
+        # Verifica existência
+        ok, resp = supabase_table_select(TABELA_USUARIOS, "id", {"email": email.lower()}, single=False)
+        if not ok:
+            return False, f"Erro ao verificar usuário existente: {resp}"
+        if resp:
+            return False, "E-mail já cadastrado."
+
+        senha_hash = hash_password(senha)
+        agora = datetime.now().isoformat()
+
+        dados = {
+            "nome": nome.strip(),
+            "email": email.lower(),
+            "senha_hash": senha_hash,
+            "tipo": tipo_usuario,
+            "pais": pais,
+            "email_confirmado": False,
+            "ativo": True,
+            "is_admin": is_admin,
+            "criado_em": agora,
+            "atualizado_em": agora,
+        }
+
+        ok_ins, resultado = supabase_table_insert(TABELA_USUARIOS, dados)
+        if not ok_ins:
+            return False, f"Erro ao criar conta: {resultado}"
+
+        logger.info(f"Usuário criado: {email}")
+        return True, "Conta criada com sucesso. Verifique seu e-mail para confirmar."
+
     except Exception as e:
-        logger.exception("Erro ao verificar senha")
-        return False
+        logger.exception("Erro ao cadastrar usuário")
+        return False, f"Erro interno ao criar conta: {e}"
 
 
-# ---------------------------
-# JWT genérico
-# ---------------------------
-def gerar_token_jwt(payload: Dict[str, Any], expiracao_horas: int = 1) -> str:
-    """Gera JWT com claims do payload e campos iat/exp UTC-aware."""
-    now = datetime.now(timezone.utc)
-    claims = {
-        **payload,
-        "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(hours=expiracao_horas)).timestamp())
-    }
-    token = jwt.encode(claims, SECRET_KEY, algorithm=ALGORITHM)
-    # PyJWT 2.x returns str
-    return token
-
-
-def validar_token_jwt(token: str) -> Optional[Dict[str, Any]]:
-    """Retorna payload decodificado ou None se inválido/expirado."""
+def verificar_credenciais(email: str, senha: str) -> Tuple[bool, Any]:
+    """
+    Retorna (True, user_dict) se autenticado, ou (False, mensagem) em caso de falha.
+    """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except jwt.ExpiredSignatureError:
-        logger.warning("Token expirado")
-        return None
-    except jwt.InvalidTokenError:
-        logger.warning("Token inválido")
-        return None
-    except Exception:
-        logger.exception("Erro ao validar token JWT")
-        return None
+        if not email or not senha:
+            return False, "E-mail e senha são obrigatórios."
+
+        ok, usuario = supabase_table_select(TABELA_USUARIOS, "*", {"email": email.lower()}, single=True)
+        if not ok:
+            return False, "Erro ao buscar usuário."
+
+        if not usuario:
+            return False, "E-mail ou senha incorretos."
+
+        senha_hash = usuario.get("senha_hash")
+        if not senha_hash or not verify_password(senha, senha_hash):
+            return False, "E-mail ou senha incorretos."
+
+        if not usuario.get("ativo", True):
+            return False, "Conta inativa. Contate o suporte."
+
+        return True, usuario
+
+    except Exception as e:
+        logger.exception("Erro ao verificar credenciais")
+        return False, f"Erro interno ao fazer login: {e}"
 
 
-# ---------------------------
-# Token reset de senha
-# ---------------------------
-def gerar_token_reset_senha(usuario_id: int, email: str) -> str:
-    """Gera token JWT para reset de senha — payload padronizado."""
-    payload = {"tipo": "reset_senha", "usuario_id": usuario_id, "email": email}
-    return gerar_token_jwt(payload, expiracao_horas=1)  # 1 hora
+def buscar_usuario_por_email(email: str) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    try:
+        ok, usuario = supabase_table_select(TABELA_USUARIOS, "*", {"email": email.lower()}, single=True)
+        if not ok:
+            return False, None
+        return True, usuario
+    except Exception as e:
+        logger.exception("Erro ao buscar usuário por e-mail")
+        return False, None
 
 
-def validar_token_reset_senha(token: str) -> Optional[Dict[str, Any]]:
-    """Valida token de reset e garante o campo 'tipo' correto. Retorna payload ou None."""
-    payload = validar_token_jwt(token)
-    if not payload:
-        return None
-    if payload.get("tipo") != "reset_senha":
-        logger.warning("Token não é do tipo reset_senha")
-        return None
-    return payload
+def buscar_usuario_por_id(user_id: int) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    try:
+        ok, usuario = supabase_table_select(TABELA_USUARIOS, "*", {"id": user_id}, single=True)
+        if not ok:
+            return False, None
+        return True, usuario
+    except Exception as e:
+        logger.exception("Erro ao buscar usuário por ID")
+        return False, None
 
 
-# ---------------------------
-# Token confirmação de e-mail
-# ---------------------------
-def gerar_token_confirmacao_email(usuario_id: int, email: str) -> str:
-    """Gera token JWT para confirmação de e-mail — expira em 24h."""
-    payload = {"tipo": "confirmacao_email", "user_id": usuario_id, "email": email}
-    return gerar_token_jwt(payload, expiracao_horas=24)
+def atualizar_usuario(user_id: int, **kwargs: Any) -> Tuple[bool, str]:
+    allowed = {
+        "nome", "email", "senha_hash", "tipo", "pais",
+        "email_confirmado", "ativo", "is_admin", "email_confirm_token",
+        "reset_password_token", "reset_password_expires"
+    }
+    dados_update = {k: v for k, v in kwargs.items() if k in allowed}
+    if "email" in dados_update:
+        dados_update["email"] = dados_update["email"].lower()
+    dados_update["atualizado_em"] = datetime.now().isoformat()
+    try:
+        ok, resp = supabase_table_update(TABELA_USUARIOS, dados_update, {"id": user_id})
+        if ok:
+            return True, "Usuário atualizado com sucesso."
+        else:
+            return False, f"Erro ao atualizar usuário: {resp}"
+    except Exception as e:
+        logger.exception("Erro ao atualizar usuário")
+        return False, f"Erro interno ao atualizar usuário: {e}"
 
 
-def validar_token_confirmacao_email(token: str) -> Optional[Dict[str, Any]]:
-    """Valida token de confirmação de e-mail; retorna payload ou None."""
-    payload = validar_token_jwt(token)
-    if not payload:
-        return None
-    if payload.get("tipo") != "confirmacao_email":
-        logger.warning("Token não é do tipo confirmacao_email")
-        return None
-    return payload
+def alterar_senha(user_id: int, nova_senha: str) -> Tuple[bool, str]:
+    if len(nova_senha) < 8:
+        return False, "Senha deve ter ao menos 8 caracteres."
+    senha_hash = hash_password(nova_senha)
+    return atualizar_usuario(user_id, senha_hash=senha_hash)
 
 
-# ---------------------------
-# Helpers para Streamlit
-# ---------------------------
-def usuario_logado(session_state) -> bool:
-    """Verifica se existe user_id na session_state."""
-    return bool(session_state.get("user_id"))
+def deletar_usuario(user_id: int) -> Tuple[bool, str]:
+    try:
+        ok, resp = supabase_table_delete(TABELA_USUARIOS, {"id": user_id})
+        if ok:
+            return True, "Usuário deletado com sucesso."
+        else:
+            return False, f"Erro ao deletar usuário: {resp}"
+    except Exception as e:
+        logger.exception("Erro ao deletar usuário")
+        return False, f"Erro interno ao deletar usuário: {e}"
 
 
-def logout(session_state) -> None:
-    """Limpa chaves de sessão relacionadas ao login."""
-    for k in ("user_id", "user_data", "user_email", "user_name", "is_admin"):
-        if k in session_state:
-            del session_state[k]
-    # opcional: set page/login
-    session_state["page"] = "Login"
-    logger.info("Usuário deslogado (session_state limpo)")
+# Compatibilidade
+def atualizar_tipo_usuario(user_id: int, novo_tipo: str) -> Tuple[bool, str]:
+    return atualizar_usuario(user_id, tipo=novo_tipo)
 
 
-# Export
-__all__ = [
-    "hash_password",
-    "verify_password",
-    "gerar_token_jwt",
-    "validar_token_jwt",
-    "gerar_token_reset_senha",
-    "validar_token_reset_senha",
-    "gerar_token_confirmacao_email",
-    "validar_token_confirmacao_email",
-    "usuario_logado",
-    "logout",
-]
+def atualizar_status_usuario(user_id: int, novo_status: bool) -> Tuple[bool, str]:
+    return atualizar_usuario(user_id, ativo=novo_status)
+
+
+def marcar_email_como_confirmado(email: str) -> Tuple[bool, str]:
+    try:
+        ok, _ = supabase_table_update(TABELA_USUARIOS, {
+            "email_confirmado": True,
+            "email_confirm_token": None,
+            "atualizado_em": datetime.now().isoformat()
+        }, {"email": email.lower()})
+        if ok:
+            return True, "E-mail confirmado com sucesso."
+        return False, "Falha ao marcar e-mail como confirmado."
+    except Exception as e:
+        logger.exception("Erro ao marcar e-mail como confirmado")
+        return False, f"Erro interno ao confirmar e-mail: {e}"

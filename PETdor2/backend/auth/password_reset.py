@@ -8,14 +8,16 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Tuple, Dict, Any
 
-# Importações absolutas — EVITA import circular
+# Importações absolutas para evitar import circular
 from backend.auth.security import (
     gerar_token_reset_senha,
     validar_token_reset_senha,
     hash_password,
 )
 
+# Função correta do email_sender (sem nome, sem token separado)
 from backend.utils.email_sender import enviar_email_recuperacao_senha
+
 from backend.database.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
@@ -26,14 +28,14 @@ logger = logging.getLogger(__name__)
 # ======================================================================
 def solicitar_reset_senha(email: str) -> Tuple[bool, str]:
     """
-    Gera o token, registra no banco de dados e envia o e-mail de recuperação.
-    Por segurança, sempre retorna a mesma mensagem caso o e-mail exista ou não.
+    Gera token de recuperação, salva no banco e envia o e-mail.
+    Sem revelar se o e-mail existe ou não (segurança).
     """
 
     try:
         supabase = get_supabase()
 
-        # Busca usuário
+        # Encontrar usuário
         response = (
             supabase.from_("usuarios")
             .select("id, nome, email")
@@ -44,29 +46,30 @@ def solicitar_reset_senha(email: str) -> Tuple[bool, str]:
 
         usuario = response.data
 
-        # Segurança: nunca revelar se existe ou não
+        # Por segurança, nunca revelar se o email existe
         if not usuario:
             return True, "Se o e-mail estiver cadastrado, você receberá o link."
 
         usuario_id = usuario["id"]
-        nome_usuario = usuario["nome"]
 
-        # Gera token JWT
+        # Criar token JWT
         token = gerar_token_reset_senha(usuario_id, email)
 
         expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
-        # Salva token e expiração no banco
+        # Salvar token no banco
         supabase.from_("usuarios").update({
             "reset_password_token": token,
             "reset_password_expires": expires_at.isoformat()
         }).eq("id", usuario_id).execute()
 
-        # Envia e-mail ao usuário
+        # URL que será enviada ao usuário
+        link_recuperacao = f"https://petdor.streamlit.app/resetar_senha?token={token}"
+
+        # Chamada correta do email_sender
         ok_email, msg_email = enviar_email_recuperacao_senha(
             destinatario_email=email,
-            destinatario_nome=nome_usuario,
-            token=token
+            link_recuperacao=link_recuperacao
         )
 
         if not ok_email:
@@ -85,8 +88,7 @@ def solicitar_reset_senha(email: str) -> Tuple[bool, str]:
 # ======================================================================
 def validar_token_reset(token: str) -> Tuple[bool, Dict[str, Any]]:
     """
-    Valida estrutura do token, validade, consistência com o banco
-    e data de expiração.
+    Valida o token no JWT e no banco de dados.
     """
 
     try:
@@ -107,15 +109,13 @@ def validar_token_reset(token: str) -> Tuple[bool, Dict[str, Any]]:
         )
 
         usuario = resp.data
-
         if not usuario:
             return False, {"erro": "Token inválido."}
 
-        # Token no banco precisa ser igual ao recebido
+        # Token salvo no banco deve ser igual ao recebido
         if usuario["reset_password_token"] != token:
             return False, {"erro": "Token inválido ou já utilizado."}
 
-        # Verifica expiração
         expires = datetime.fromisoformat(
             usuario["reset_password_expires"]
         ).replace(tzinfo=timezone.utc)
@@ -135,7 +135,7 @@ def validar_token_reset(token: str) -> Tuple[bool, Dict[str, Any]]:
 # ======================================================================
 def redefinir_senha_com_token(token: str, nova_senha: str) -> Tuple[bool, str]:
     """
-    Valida o token, verifica requisitos da senha e salva no banco.
+    Valida token, valida a senha e aplica nova senha ao usuário.
     """
 
     try:

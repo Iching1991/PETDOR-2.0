@@ -1,11 +1,15 @@
-# PETdor_2.0/especies/aves.py
+# PETdor2/backend/especies/aves.py
 
 """
 🦜 Configuração de avaliação para AVES.
 Escala: 0 a 7 — baseada em observação comportamental geral.
 """
 
-from .index import EspecieConfig, Pergunta  # Importação relativa correta
+# --------------------------------------------------------------
+# 🚨 IMPORTAÇÃO CORRIGIDA (Antes estava from .index ❌)
+# --------------------------------------------------------------
+from .base import EspecieConfig, Pergunta
+
 
 CONFIG_AVES = EspecieConfig(
     nome="Aves",

@@ -25,3 +25,31 @@ __all__ = [
     "get_especies_ids",
     "get_escala_labels",
 ]
+
+  # PETdor2/backend/especies/__init__.py
+  """
+  Registra e disponibiliza todas as espécies do sistema.
+  """
+  from .index import (
+      EspecieConfig,
+      Pergunta,
+      registrar_especie,
+      buscar_especie_por_id,
+      listar_especies,
+      get_especies_nomes,
+      get_especies_ids,
+      get_escala_labels,
+      carregar_especies,
+  )
+
+  __all__ = [
+      "EspecieConfig",
+      "Pergunta",
+      "registrar_especie",
+      "buscar_especie_por_id",
+      "listar_especies",
+      "get_especies_nomes",
+      "get_especies_ids",
+      "get_escala_labels",
+      "carregar_especies",
+  ]

@@ -20,7 +20,7 @@ def render():
     na **avaliação da dor em animais**, utilizando escalas científicas adaptadas para cada espécie.
 
     Nosso objetivo é fornecer uma ferramenta simples, rápida e confiável para apoiar decisões clínicas 
-    e melhorar o bem-estar dos pets.
+    e melhorar o bem-estar dos pets e a comunicação entre tutor e veterinario.
 
     ---
 
@@ -34,15 +34,15 @@ def render():
     ---
 
     ## 👥 Criador
-    **Agnaldo Baldissera**  
+    **Agnaldo Angelico Baldissera**  
     Desenvolvedor e idealizador do PETDor.
 
     ---
 
     ## 📬 Contato
     Se tiver dúvidas ou sugestões:
-    - 📧 Email: suporte@petdor.com
-    - 🌐 Site: https://petdor.com
+    - 📧 Email: relatorio@petdor.app
+    - 🌐 Site: petdor.app
     """)
 
 __all__ = ["render"]

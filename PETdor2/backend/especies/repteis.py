@@ -1,10 +1,15 @@
-# PETdor_2.0/especies/repteis.py
+# PETdor2/backend/especies/repteis.py
 
 """
 🦎 Configuração de avaliação para RÉPTEIS
 ⚠ Em construção — avaliação especializada ainda não disponível.
 """
-from especies.index import EspecieConfig, Pergunta
+
+# --------------------------------------------------------------
+# 🚨 IMPORTAÇÃO CORRIGIDA (Antes estava from especies.index ❌)
+# --------------------------------------------------------------
+from .base import EspecieConfig, Pergunta
+
 
 CONFIG_REPTEIS = EspecieConfig(
     nome="Répteis",

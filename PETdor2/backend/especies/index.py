@@ -1,11 +1,10 @@
-# PETdor2/especies/index.py
+# PETdor2/backend/especies/index.py
 """
 Sistema central de registro e consulta das espécies e suas configurações.
 """
-
 import logging
 from typing import Dict, List, Optional
-from .base import EspecieConfig, Pergunta
+from .base import EspecieConfig, Pergunta # Importação correta de .base
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +14,6 @@ _ESPECIES_REGISTRADAS: Dict[str, dict] = {}
 # ==========================================================
 # Funções de registro e busca
 # ==========================================================
-
 def registrar_especie(config):
     """
     Registra a configuração de uma espécie.
@@ -24,37 +22,29 @@ def registrar_especie(config):
     # Se for dataclass, converte para dict
     if isinstance(config, EspecieConfig):
         config = config.to_dict()
-
-    especie_id = config.get("id")
+    especie_id = config.get("id") # Pega o 'id' que vem do to_dict() da EspecieConfig
     if not especie_id:
         raise ValueError("Configuração de espécie inválida: falta o campo 'id'.")
-
     if especie_id in _ESPECIES_REGISTRADAS:
         logger.warning(f"⚠️ Espécie '{especie_id}' já registrada. Atualizando...")
-
     _ESPECIES_REGISTRADAS[especie_id] = config
     logger.info(f"✅ Espécie '{config.get('nome')}' registrada com sucesso")
-
 
 def buscar_especie_por_id(especie_id: str) -> Optional[dict]:
     """Retorna a configuração completa da espécie."""
     return _ESPECIES_REGISTRADAS.get(especie_id)
 
-
 def listar_especies() -> List[dict]:
     """Lista todas as espécies registradas."""
     return list(_ESPECIES_REGISTRADAS.values())
-
 
 def get_especies_nomes() -> List[str]:
     """Retorna somente os nomes das espécies registradas."""
     return [config["nome"] for config in _ESPECIES_REGISTRADAS.values()]
 
-
 def get_especies_ids() -> List[str]:
     """Retorna somente os IDs das espécies registradas."""
     return list(_ESPECIES_REGISTRADAS.keys())
-
 
 def get_escala_labels(escala: str) -> List[str]:
     """
@@ -75,7 +65,6 @@ def get_escala_labels(escala: str) -> List[str]:
             raise ValueError(f"Escala desconhecida: {escala}")
     raise ValueError(f"Escala desconhecida: {escala}")
 
-
 # ==========================================================
 # Função para Streamlit carregar espécies
 # ==========================================================
@@ -86,29 +75,27 @@ def carregar_especies():
     """
     return listar_especies()
 
-
 # ==========================================================
 # Importar e registrar automaticamente todas as espécies
 # ==========================================================
-
 ESPECIES_IMPORTS = {
     "cao": "CONFIG_CAES",
     "gato": "CONFIG_GATOS",
     "coelho": "CONFIG_COELHO",
-    "porquinho": "CONFIG_PORQUINHO",
+    "porquinho_da_india": "CONFIG_PORQUINHO_DA_INDIA", # <--- CORRIGIDO AQUI!
     "aves": "CONFIG_AVES",
     "repteis": "CONFIG_REPTEIS"
 }
 
 for modulo, config_attr in ESPECIES_IMPORTS.items():
     try:
+        # A importação relativa funciona porque index.py está dentro de um pacote
         mod = __import__(f".{modulo}", globals(), locals(), [config_attr])
         registrar_especie(getattr(mod, config_attr))
     except Exception as e:
         logger.error(f"❌ Erro ao registrar {modulo}: {e}")
 
 logger.info(f"✅ Total de espécies registradas: {len(_ESPECIES_REGISTRADAS)}")
-
 
 __all__ = [
     "EspecieConfig",

@@ -1,11 +1,15 @@
-# PETdor_2.0/especies/gato.py
+# PETdor2/backend/especies/gato.py
 
 """
 🐈 Configuração de avaliação de dor para GATOS.
 Escala: 0 a 7 (baseada em escalas de dor felina).
 """
 
-from .index import EspecieConfig, Pergunta  # Importação relativa correta
+# --------------------------------------------------------------
+# 🚨 IMPORTAÇÃO CORRIGIDA (ANTES estava from .index ❌)
+# --------------------------------------------------------------
+from .base import EspecieConfig, Pergunta
+
 
 CONFIG_GATOS = EspecieConfig(
     nome="Gato",

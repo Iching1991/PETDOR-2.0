@@ -1,4 +1,8 @@
-# PETdor2/backend/database/__init__.py
+# backend/database/__init__.py
+"""
+Inicializa e expõe funções do cliente Supabase de forma simplificada.
+"""
+
 from .supabase_client import (
     get_supabase,
     testar_conexao,
@@ -7,3 +11,6 @@ from .supabase_client import (
     supabase_table_update,
     supabase_table_delete,
 )
+
+__all__ = [
+    "

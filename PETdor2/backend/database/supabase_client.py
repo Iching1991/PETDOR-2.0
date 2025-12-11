@@ -2,16 +2,19 @@
 
 import os
 import streamlit as st
-from typing import Any, Dict, List, Optional, Tuple, Union
-from supabase import create_client, Client
+from supabase import create_client
+from typing import Any, Dict, List, Optional, Tuple
+
 
 # ============================================================
-# 1. Criar cliente Supabase (Streamlit Cloud + Local .env)
+#   CRIAÇÃO DO CLIENTE SUPABASE
 # ============================================================
-
-def get_supabase() -> Client:
+def get_supabase():
+    """
+    Retorna o client do Supabase utilizando st.secrets (produção)
+    ou variáveis de ambiente locais (.env).
+    """
     try:
-        # Prioriza secrets no deploy
         if "streamlit" in os.environ.get("STREAMLIT_VERSION", ""):
             supabase_url = st.secrets["supabase"]["SUPABASE_URL"]
             supabase_key = st.secrets["supabase"]["SUPABASE_KEY"]
@@ -20,35 +23,37 @@ def get_supabase() -> Client:
             supabase_key = os.getenv("SUPABASE_ANON_KEY")
 
         if not supabase_url or not supabase_key:
-            raise RuntimeError("❌ Supabase não configurado corretamente.")
+            raise ValueError("Variáveis SUPABASE_URL e SUPABASE_ANON_KEY não configuradas.")
 
         return create_client(supabase_url, supabase_key)
 
     except Exception as e:
-        st.error(f"⚠️ Erro ao criar cliente Supabase: {e}")
+        st.error(f"❌ Erro ao criar cliente Supabase: {e}")
         raise
 
-# ============================================================
-# 2. Testar conexão
-# ============================================================
 
+# ============================================================
+#   TESTE DE CONEXÃO
+# ============================================================
 def testar_conexao() -> bool:
     """
-    Faz uma consulta simples no Supabase para validar a conexão.
+    Realiza um SELECT simples para validar a conexão.
     """
     try:
         client = get_supabase()
         client.table("usuarios").select("*").limit(1).execute()
-        st.success("✅ Conexão com Supabase estabelecida!")
+
+        st.success("✅ Conexão com o Supabase estabelecida!")
         return True
+
     except Exception as e:
         st.error(f"❌ Falha ao testar conexão com Supabase: {e}")
         return False
 
-# ============================================================
-# 3. SELECT genérico
-# ============================================================
 
+# ============================================================
+#   SELECT GENÉRICO
+# ============================================================
 def supabase_table_select(
     tabela: str,
     colunas: str = "*",
@@ -56,8 +61,10 @@ def supabase_table_select(
     order_by: Optional[str] = None,
     desc: bool = False,
     single: bool = False
-) -> Tuple[bool, Union[List[Dict[str, Any]], Dict[str, Any], str]]:
-
+) -> Tuple[bool, Any]:
+    """
+    SELECT genérico no Supabase.
+    """
     try:
         client = get_supabase()
         query = client.table(tabela).select(colunas)
@@ -74,42 +81,37 @@ def supabase_table_select(
 
         response = query.execute()
 
-        return True, response.data if response.data else ([] if not single else {})
+        return True, response.data or []
 
     except Exception as e:
         return False, f"Erro ao buscar dados: {e}"
 
-# ============================================================
-# 4. INSERT genérico
-# ============================================================
 
+# ============================================================
+#   INSERT GENÉRICO
+# ============================================================
 def supabase_table_insert(
     tabela: str,
     dados: Dict[str, Any]
-) -> Tuple[bool, Union[List[Dict[str, Any]], str]]:
-
+) -> Tuple[bool, Any]:
     try:
         client = get_supabase()
         response = client.table(tabela).insert(dados).execute()
 
-        if response.data:
-            return True, response.data
-
-        return False, "Falha ao inserir ou nenhum retorno."
+        return True, response.data
 
     except Exception as e:
-        return False, f"Erro ao inserir: {e}"
+        return False, f"Erro ao inserir dados: {e}"
+
 
 # ============================================================
-# 5. UPDATE genérico
+#   UPDATE GENÉRICO
 # ============================================================
-
 def supabase_table_update(
     tabela: str,
     dados_update: Dict[str, Any],
     filtros: Dict[str, Any]
-) -> Tuple[bool, Union[List[Dict[str, Any]], str]]:
-
+) -> Tuple[bool, Any]:
     try:
         client = get_supabase()
         query = client.table(tabela).update(dados_update)
@@ -118,24 +120,19 @@ def supabase_table_update(
             query = query.eq(coluna, valor)
 
         response = query.execute()
-
-        if response.data:
-            return True, response.data
-
-        return False, "Nenhum registro atualizado."
+        return True, response.data or []
 
     except Exception as e:
-        return False, f"Erro ao atualizar: {e}"
+        return False, f"Erro ao atualizar dados: {e}"
+
 
 # ============================================================
-# 6. DELETE genérico
+#   DELETE GENÉRICO
 # ============================================================
-
 def supabase_table_delete(
     tabela: str,
     filtros: Dict[str, Any]
 ) -> Tuple[bool, int]:
-
     try:
         client = get_supabase()
         query = client.table(tabela).delete()
@@ -145,8 +142,9 @@ def supabase_table_delete(
 
         response = query.execute()
 
-        deletados = len(response.data) if response.data else 0
-        return True, deletados
+        deleted_count = len(response.data or [])
+
+        return True, deleted_count
 
     except Exception as e:
         return False, 0

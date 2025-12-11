@@ -1,9 +1,6 @@
 # PETdor2/backend/database/__init__.py
-
 """
-Inicializa e exporta funcionalidades do módulo de banco de dados.
-Este arquivo garante que funções importantes fiquem disponíveis
-para importações no restante do projeto.
+Exporta funções públicas do módulo database.
 """
 
 from .supabase_client import (

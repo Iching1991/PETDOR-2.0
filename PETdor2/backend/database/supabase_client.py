@@ -2,33 +2,53 @@
 
 import os
 import streamlit as st
-from supabase import create_client, Client
-from typing import Any, Dict, Optional, Tuple
-from dotenv import load_dotenv
+from supabase import create_client
 
-load_dotenv()
+# =====================================================
+# 1) OBTER CREDENCIAIS DO SUPABASE
+# =====================================================
 
-# ======================================================================
-# 🔌 Criar cliente Supabase corretamente (versão 2.x)
-# ======================================================================
-def get_supabase() -> Client:
+def load_credentials():
+    """
+    Carrega as credenciais do Supabase a partir do Streamlit secrets
+    ou de variáveis de ambiente locais.
+    """
     try:
-        # 1️⃣ STREAMLIT SECRETS (PRIORIDADE)
         if "supabase" in st.secrets:
-            supabase_url = st.secrets["supabase"].get("SUPABASE_URL")
-            supabase_key = st.secrets["supabase"].get("SUPABASE_KEY") or \
-                           st.secrets["supabase"].get("SUPABASE_ANON_KEY")
+            url = st.secrets["supabase"].get("SUPABASE_URL")
+            key = st.secrets["supabase"].get("SUPABASE_KEY") or \
+                  st.secrets["supabase"].get("SUPABASE_ANON_KEY")
         else:
-            # 2️⃣ .ENV LOCAL (fallback)
-            supabase_url = os.getenv("SUPABASE_URL")
-            supabase_key = os.getenv("SUPABASE_ANON_KEY")
+            url = os.getenv("SUPABASE_URL")
+            key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
 
-        if not supabase_url or not supabase_key:
-            raise RuntimeError("Variáveis do Supabase não configuradas.")
+        if not url or not key:
+            raise ValueError("Variáveis do Supabase não configuradas.")
 
-        # ✔️ Versão correta — NADA de parâmetros adicionais
-        client = create_client(supabase_url, supabase_key)
+        return url, key
 
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar credenciais do Supabase: {e}")
+        return None, None
+
+
+# =====================================================
+# 2) CRIAR CLIENTE SUPABASE
+# =====================================================
+
+def get_supabase():
+    """
+    Cria e retorna o cliente Supabase.
+    Compatível com supabase-py v2.x (NÃO aceita proxy).
+    """
+    url, key = load_credentials()
+
+    if not url or not key:
+        st.error("❌ Variáveis do Supabase não configuradas.")
+        raise RuntimeError("Credenciais ausentes.")
+
+    try:
+        client = create_client(url, key)
         return client
 
     except Exception as e:
@@ -36,31 +56,27 @@ def get_supabase() -> Client:
         raise
 
 
-# ======================================================================
-# 🔍 Testar conexão
-# ======================================================================
+# =====================================================
+# 3) TESTAR CONEXÃO
+# =====================================================
+
 def testar_conexao() -> bool:
+    """ Testa a conexão consultando a tabela 'usuarios'. """
     try:
         client = get_supabase()
         client.table("usuarios").select("*").limit(1).execute()
         return True
+
     except Exception as e:
         st.error(f"❌ Falha ao conectar ao Supabase: {e}")
         return False
 
 
-# ======================================================================
-# 📌 SELECT
-# ======================================================================
-def supabase_table_select(
-    tabela: str,
-    colunas: str = "*",
-    filtros: Optional[Dict[str, Any]] = None,
-    order_by: Optional[str] = None,
-    desc: bool = False,
-    single: bool = False
-) -> Tuple[bool, Any]:
+# =====================================================
+# 4) SELECT
+# =====================================================
 
+def supabase_table_select(tabela: str, colunas="*", filtros=None, order_by=None, desc=False, single=False):
     try:
         client = get_supabase()
         query = client.table(tabela).select(colunas)
@@ -76,28 +92,31 @@ def supabase_table_select(
             query = query.single()
 
         resp = query.execute()
-        return True, resp.data or {}
+        return True, resp.data
 
     except Exception as e:
         return False, f"Erro no SELECT: {e}"
 
 
-# ======================================================================
-# ➕ INSERT
-# ======================================================================
-def supabase_table_insert(tabela: str, dados: Dict[str, Any]):
+# =====================================================
+# 5) INSERT
+# =====================================================
+
+def supabase_table_insert(tabela: str, dados: dict):
     try:
         client = get_supabase()
         resp = client.table(tabela).insert(dados).execute()
         return True, resp.data
+
     except Exception as e:
         return False, f"Erro no INSERT: {e}"
 
 
-# ======================================================================
-# ✏ UPDATE
-# ======================================================================
-def supabase_table_update(tabela: str, dados_update: Dict[str, Any], filtros: Dict[str, Any]):
+# =====================================================
+# 6) UPDATE
+# =====================================================
+
+def supabase_table_update(tabela: str, dados_update: dict, filtros: dict):
     try:
         client = get_supabase()
         query = client.table(tabela).update(dados_update)
@@ -112,10 +131,11 @@ def supabase_table_update(tabela: str, dados_update: Dict[str, Any], filtros: Di
         return False, f"Erro no UPDATE: {e}"
 
 
-# ======================================================================
-# ❌ DELETE
-# ======================================================================
-def supabase_table_delete(tabela: str, filtros: Dict[str, Any]):
+# =====================================================
+# 7) DELETE
+# =====================================================
+
+def supabase_table_delete(tabela: str, filtros: dict):
     try:
         client = get_supabase()
         query = client.table(tabela).delete()
@@ -124,8 +144,7 @@ def supabase_table_delete(tabela: str, filtros: Dict[str, Any]):
             query = query.eq(k, v)
 
         resp = query.execute()
-        deleted = len(resp.data) if resp.data else 0
-        return True, deleted
+        return True, len(resp.data) if resp.data else 0
 
     except Exception as e:
         return False, f"Erro no DELETE: {e}"

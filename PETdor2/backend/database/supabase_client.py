@@ -1,54 +1,55 @@
-# PETdor2/backend/database/supabase_client.py
+# backend/database/supabase_client.py
 
 import os
 import streamlit as st
 from supabase import create_client, Client
-from typing import Any, Dict, Optional, Tuple, List
+from typing import Any, Dict, List, Tuple, Optional
+
+# Tentativa de importação segura
+try:
+    from supabase.lib.client import APIResponse
+except Exception:
+    APIResponse = Any
 
 
-# =========================================================
-# Criar instância do Supabase
-# =========================================================
+# =====================================================
+# Obter cliente Supabase
+# =====================================================
 def get_supabase() -> Client:
     try:
-        # Prioriza st.secrets no Streamlit Cloud
-        if "supabase" in st.secrets:
+        if "SUPABASE_URL" in st.secrets["supabase"]:
             supabase_url = st.secrets["supabase"]["SUPABASE_URL"]
             supabase_key = st.secrets["supabase"]["SUPABASE_KEY"]
         else:
-            # Local (.env)
             supabase_url = os.getenv("SUPABASE_URL")
             supabase_key = os.getenv("SUPABASE_ANON_KEY")
 
         if not supabase_url or not supabase_key:
-            raise RuntimeError("SUPABASE_URL ou SUPABASE_KEY não configurados.")
+            raise RuntimeError("Variáveis do Supabase não configuradas corretamente.")
 
         return create_client(supabase_url, supabase_key)
 
     except Exception as e:
-        st.error(f"❌ Erro ao inicializar Supabase: {e}")
+        st.error(f"❌ Erro ao conectar ao Supabase: {e}")
         raise
 
 
-# =========================================================
-# Teste simples de conexão
-# =========================================================
+# =====================================================
+# Testar conexão
+# =====================================================
 def testar_conexao() -> bool:
     try:
         client = get_supabase()
-        # Consulta mínima na tabela "usuarios"
         client.table("usuarios").select("*").limit(1).execute()
-        st.success("✅ Conexão com Supabase OK!")
         return True
-
     except Exception as e:
-        st.error(f"❌ Falha ao testar conexão com Supabase: {e}")
+        st.error(f"❌ Falha ao conectar ao Supabase: {e}")
         return False
 
 
-# =========================================================
-# SELECT genérico
-# =========================================================
+# =====================================================
+# SELECT
+# =====================================================
 def supabase_table_select(
     tabela: str,
     colunas: str = "*",
@@ -60,70 +61,71 @@ def supabase_table_select(
 
     try:
         client = get_supabase()
-        query = client.table(tabela).select(colunas)
+        query = client.from_(tabela).select(colunas)
 
         if filtros:
-            for coluna, valor in filtros.items():
-                query = query.eq(coluna, valor)
+            for k, v in filtros.items():
+                query = query.eq(k, v)
 
         if order_by:
             query = query.order(order_by, desc=desc)
 
         if single:
-            result = query.single().execute()
-        else:
-            result = query.execute()
+            query = query.single()
 
-        return True, result.data
+        resp: APIResponse = query.execute()
+
+        return True, resp.data or {}
 
     except Exception as e:
-        return False, f"Erro ao buscar dados ({tabela}): {e}"
+        return False, f"Erro no SELECT: {e}"
 
 
-# =========================================================
-# INSERT genérico
-# =========================================================
+# =====================================================
+# INSERT
+# =====================================================
 def supabase_table_insert(tabela: str, dados: Dict[str, Any]):
     try:
         client = get_supabase()
-        result = client.table(tabela).insert(dados).execute()
-        return True, result.data
-
+        resp: APIResponse = client.from_(tabela).insert(dados).execute()
+        return True, resp.data
     except Exception as e:
-        return False, f"Erro ao inserir ({tabela}): {e}"
+        return False, f"Erro no INSERT: {e}"
 
 
-# =========================================================
-# UPDATE genérico
-# =========================================================
+# =====================================================
+# UPDATE
+# =====================================================
 def supabase_table_update(tabela: str, dados_update: Dict[str, Any], filtros: Dict[str, Any]):
     try:
         client = get_supabase()
-        query = client.table(tabela).update(dados_update)
+        query = client.from_(tabela).update(dados_update)
 
-        for coluna, valor in filtros.items():
-            query = query.eq(coluna, valor)
+        for k, v in filtros.items():
+            query = query.eq(k, v)
 
-        result = query.execute()
-        return True, result.data
+        resp: APIResponse = query.execute()
+        return True, resp.data
 
     except Exception as e:
-        return False, f"Erro ao atualizar ({tabela}): {e}"
+        return False, f"Erro no UPDATE: {e}"
 
 
-# =========================================================
-# DELETE genérico
-# =========================================================
+# =====================================================
+# DELETE
+# =====================================================
 def supabase_table_delete(tabela: str, filtros: Dict[str, Any]):
     try:
         client = get_supabase()
-        query = client.table(tabela).delete()
+        query = client.from_(tabela).delete()
 
-        for coluna, valor in filtros.items():
-            query = query.eq(coluna, valor)
+        for k, v in filtros.items():
+            query = query.eq(k, v)
 
-        result = query.execute()
-        return True, len(result.data or [])
+        resp: APIResponse = query.execute()
+        deleted = len(resp.data) if resp.data else 0
+
+        return True, deleted
 
     except Exception as e:
-        return False, f"Erro ao deletar ({tabela}): {e}"
+        return False, f"Erro no DELETE: {e}"

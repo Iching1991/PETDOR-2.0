@@ -3,5 +3,7 @@ python-dotenv==1.0.0
 bcrypt==4.1.0
 pyjwt>=2.8.0,<3.0.0
 requests==2.31.0
-supabase>=2.10.0  # <--- ATUALIZADO (era 2.4.0)
+supabase==2.4.0
+gotrue==2.4.1  # <--- Versão mais antiga compatível
+httpx==0.23.3  # <--- Versão mais antiga compatível
 python-telegram-bot==20.3

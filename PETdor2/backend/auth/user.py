@@ -1,81 +1,60 @@
 # PETdor2/backend/auth/user.py
 
-import bcrypt
-import jwt
-import datetime
-import streamlit as st
 from typing import Optional, Dict, Any
-
-from backend.database.supabase_client import (
-    supabase_table_insert,
+from backend.database import (
     supabase_table_select,
+    supabase_table_insert,
     supabase_table_update,
+    supabase_table_delete
 )
 
-SECRET_KEY = st.secrets["tokens"]["SECRET_KEY"]
+
+# --------------------------------------------------------
+# Criar usuário
+# --------------------------------------------------------
+def criar_usuario(dados: Dict[str, Any]):
+    return supabase_table_insert("usuarios", dados)
 
 
-# -----------------------------------------------------------
-# 🔐 Criar Usuário
-# -----------------------------------------------------------
-
-def criar_usuario(nome: str, email: str, senha: str) -> Dict[str, Any]:
-    """Cria um usuário no Supabase com hash de senha."""
-    hashed = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
-
-    success, data = supabase_table_insert(
-        "usuarios",
-        {
-            "nome": nome,
-            "email": email.lower(),
-            "senha": hashed,
-            "email_confirmado": False,
-        }
-    )
-
-    return {"success": success, "data": data}
-
-
-# -----------------------------------------------------------
-# 🔐 Login
-# -----------------------------------------------------------
-
-def autenticar_usuario(email: str, senha: str) -> Dict[str, Any]:
-    """Autentica usuário verificando hash da senha."""
-    ok, user = supabase_table_select(
-        "usuarios",
-        filtros={"email": email.lower()},
+# --------------------------------------------------------
+# Buscar por email
+# --------------------------------------------------------
+def buscar_usuario_por_email(email: str):
+    return supabase_table_select(
+        tabela="usuarios",
+        filtros={"email": email},
         single=True
     )
 
-    if not ok or not user:
-        return {"success": False, "error": "Usuário não encontrado"}
 
-    if not bcrypt.checkpw(senha.encode(), user["senha"].encode()):
-        return {"success": False, "error": "Senha incorreta"}
+# --------------------------------------------------------
+# Autenticar
+# --------------------------------------------------------
+def autenticar_usuario(email: str, senha_hash: str):
+    ok, usuario = buscar_usuario_por_email(email)
 
-    token = gerar_token({"user_id": user["id"]})
+    if not ok or not usuario:
+        return False, "Usuário não encontrado."
 
-    return {"success": True, "token": token, "user": user}
+    if usuario.get("senha") != senha_hash:
+        return False, "Senha incorreta."
 
-
-# -----------------------------------------------------------
-# 🔐 Gerar JWT
-# -----------------------------------------------------------
-
-def gerar_token(payload: dict) -> str:
-    payload["exp"] = datetime.datetime.utcnow() + datetime.timedelta(hours=12)
-    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+    return True, usuario
 
 
-# -----------------------------------------------------------
-# 🔐 Confirmar e-mail
-# -----------------------------------------------------------
-
-def confirmar_email(user_id: str) -> bool:
-    ok, _ = supabase_table_update(
+# --------------------------------------------------------
+# Atualizar dados
+# --------------------------------------------------------
+def atualizar_usuario(user_id: str, dados: Dict[str, Any]):
+    return supabase_table_update(
         "usuarios",
-        {"email_confirmado": True},
-        {"id": user_id}
+        dados_update=dados,
+        filtros={"id": user_id}
     )
-    return ok
+
+
+# --------------------------------------------------------
+# Deletar usuário
+# --------------------------------------------------------
+def deletar_usuario(user_id: str):
+    return supabase_table_delete("usuarios", {"id": user_id})

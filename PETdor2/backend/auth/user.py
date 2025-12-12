@@ -3,96 +3,79 @@
 import bcrypt
 import jwt
 import datetime
-from typing import Optional, Dict, Any, Tuple
+import streamlit as st
+from typing import Optional, Dict, Any
 
 from backend.database.supabase_client import (
-    supabase_table_select,
     supabase_table_insert,
+    supabase_table_select,
     supabase_table_update,
 )
 
-from backend.utils.email_sender import enviar_email_confirmacao
+SECRET_KEY = st.secrets["tokens"]["SECRET_KEY"]
 
 
-# ======================================================
-# CONFIG
-# ======================================================
+# -----------------------------------------------------------
+# 🔐 Criar Usuário
+# -----------------------------------------------------------
 
-JWT_SECRET = "secret"
-JWT_EXP_DELTA = 86400 * 7  # 7 dias
+def criar_usuario(nome: str, email: str, senha: str) -> Dict[str, Any]:
+    """Cria um usuário no Supabase com hash de senha."""
+    hashed = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
 
-
-# ======================================================
-# HASH / VERIFY
-# ======================================================
-
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-
-
-def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode(), hashed.encode())
-
-
-# ======================================================
-# LOGIN
-# ======================================================
-
-def autenticar_usuario(email: str, senha: str) -> Tuple[bool, str, Optional[Dict]]:
-    ok, usuario = supabase_table_select(
+    success, data = supabase_table_insert(
         "usuarios",
-        filtros={"email": email},
+        {
+            "nome": nome,
+            "email": email.lower(),
+            "senha": hashed,
+            "email_confirmado": False,
+        }
+    )
+
+    return {"success": success, "data": data}
+
+
+# -----------------------------------------------------------
+# 🔐 Login
+# -----------------------------------------------------------
+
+def autenticar_usuario(email: str, senha: str) -> Dict[str, Any]:
+    """Autentica usuário verificando hash da senha."""
+    ok, user = supabase_table_select(
+        "usuarios",
+        filtros={"email": email.lower()},
         single=True
     )
 
-    if not ok or not usuario:
-        return False, "Usuário não encontrado.", None
+    if not ok or not user:
+        return {"success": False, "error": "Usuário não encontrado"}
 
-    if not verify_password(senha, usuario["senha"]):
-        return False, "Senha incorreta.", None
+    if not bcrypt.checkpw(senha.encode(), user["senha"].encode()):
+        return {"success": False, "error": "Senha incorreta"}
 
-    token = gerar_token(usuario["id"])
+    token = gerar_token({"user_id": user["id"]})
 
-    return True, token, usuario
-
-
-# ======================================================
-# TOKEN
-# ======================================================
-
-def gerar_token(user_id: str) -> str:
-    payload = {
-        "user_id": user_id,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=JWT_EXP_DELTA)
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    return {"success": True, "token": token, "user": user}
 
 
-# ======================================================
-# CADASTRO
-# ======================================================
+# -----------------------------------------------------------
+# 🔐 Gerar JWT
+# -----------------------------------------------------------
 
-def cadastrar_usuario(dados: Dict[str, Any]) -> Tuple[bool, str]:
-    dados["senha"] = hash_password(dados["senha"])
-    dados["email_confirmado"] = False
-
-    ok, resp = supabase_table_insert("usuarios", dados)
-
-    if not ok:
-        return False, resp
-
-    enviar_email_confirmacao(dados["email"], dados["nome"])
-
-    return True, "Usuário cadastrado com sucesso."
+def gerar_token(payload: dict) -> str:
+    payload["exp"] = datetime.datetime.utcnow() + datetime.timedelta(hours=12)
+    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
 
-# ======================================================
-# CONFIRMAR EMAIL
-# ======================================================
+# -----------------------------------------------------------
+# 🔐 Confirmar e-mail
+# -----------------------------------------------------------
 
-def confirmar_email(email: str) -> Tuple[bool, str]:
-    return supabase_table_update(
+def confirmar_email(user_id: str) -> bool:
+    ok, _ = supabase_table_update(
         "usuarios",
         {"email_confirmado": True},
-        {"email": email}
+        {"id": user_id}
     )
+    return ok

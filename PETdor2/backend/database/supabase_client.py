@@ -1,126 +1,166 @@
-# backend/database/supabase_client.py
-
-import os
 import streamlit as st
-from supabase import create_client, Client
-from dotenv import load_dotenv
+import requests
+from typing import Optional, Dict, Any, List
 
-load_dotenv()
+def get_supabase_client():
+    """
+    Retorna as credenciais do Supabase configuradas via Streamlit Secrets.
+    """
+    try:
+        url = st.secrets["supabase"]["SUPABASE_URL"]
+        key = st.secrets["supabase"]["SUPABASE_KEY"]
+        return {"url": url, "key": key}
+    except Exception as e:
+        st.error(f"Erro ao carregar credenciais do Supabase: {e}")
+        return None
 
-# ===========================================================
-# LEITURA DAS VARIÁVEIS
-# ===========================================================
-def load_supabase_env():
-    """Carrega as credenciais do Supabase de secrets.toml ou .env"""
-    if "supabase" in st.secrets:
-        url = st.secrets["supabase"].get("SUPABASE_URL")
-        key = st.secrets["supabase"].get("SUPABASE_KEY")
+def get_headers_with_jwt() -> Dict[str, str]:
+    """
+    Retorna headers HTTP com JWT do usuário logado (se existir).
+
+    Returns:
+        Dicionário com headers incluindo Authorization
+    """
+    client = get_supabase_client()
+    if not client:
+        return {}
+
+    headers = {
+        "apikey": client["key"],
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
+
+    # Se houver token JWT na sessão, adiciona ao header
+    if "token" in st.session_state:
+        headers["Authorization"] = f"Bearer {st.session_state['token']}"
     else:
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_ANON_KEY")
+        # Usa a chave anon como fallback
+        headers["Authorization"] = f"Bearer {client['key']}"
 
-    if not url or not key:
-        raise RuntimeError("Variáveis do Supabase não configuradas.")
+    return headers
 
-    return url, key
+def supabase_table_select(
+    table: str,
+    select: str = "*",
+    filters: Optional[Dict[str, Any]] = None,
+    order: Optional[str] = None,
+    limit: Optional[int] = None
+) -> Optional[List[Dict]]:
+    """
+    Executa SELECT em uma tabela do Supabase via REST API.
+    """
+    client = get_supabase_client()
+    if not client:
+        return None
 
+    url = f"{client['url']}/rest/v1/{table}"
+    headers = get_headers_with_jwt()
 
-# ===========================================================
-# CLIENTE DO SUPABASE
-# ===========================================================
-@st.cache_resource
-def get_supabase() -> Client:
-    """Cria um cliente global do Supabase (sem proxy, sem argumentos extras)"""
+    params = {"select": select}
+
+    if filters:
+        for key, value in filters.items():
+            if isinstance(value, bool):
+                params[key] = f"eq.{str(value).lower()}"
+            else:
+                params[key] = f"eq.{value}"
+
+    if order:
+        params["order"] = order
+
+    if limit:
+        params["limit"] = limit
 
     try:
-        supabase_url, supabase_key = load_supabase_env()
-        supabase = create_client(supabase_url, supabase_key)
-        return supabase
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erro ao consultar tabela {table}: {e}")
+        return None
 
-    except Exception as e:
-        st.error(f"❌ Erro ao conectar ao Supabase: {e}")
-        raise
+def supabase_table_insert(
+    table: str,
+    data: Dict[str, Any]
+) -> Optional[Dict]:
+    """
+    Insere um registro em uma tabela do Supabase via REST API.
+    """
+    client = get_supabase_client()
+    if not client:
+        return None
 
+    url = f"{client['url']}/rest/v1/{table}"
+    headers = get_headers_with_jwt()
 
-# ===========================================================
-# TESTE DE CONEXÃO
-# ===========================================================
-def testar_conexao() -> bool:
-    """Executa um SELECT simples para testar se a conexão funciona"""
     try:
-        client = get_supabase()
-        resp = client.table("usuarios").select("*").limit(1).execute()
-        return True
-    except Exception as e:
-        st.error(f"❌ Falha ao conectar ao Supabase: {e}")
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+        result = response.json()
+        return result[0] if result else None
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erro ao inserir em {table}: {e}")
+        return None
+
+def supabase_table_update(
+    table: str,
+    filters: Dict[str, Any],
+    data: Dict[str, Any]
+) -> Optional[List[Dict]]:
+    """
+    Atualiza registros em uma tabela do Supabase via REST API.
+    """
+    client = get_supabase_client()
+    if not client:
+        return None
+
+    url = f"{client['url']}/rest/v1/{table}"
+    headers = get_headers_with_jwt()
+
+    params = {}
+    if filters:
+        for key, value in filters.items():
+            params[key] = f"eq.{value}"
+
+    try:
+        response = requests.patch(url, headers=headers, params=params, json=data)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erro ao atualizar {table}: {e}")
+        return None
+
+def supabase_table_delete(
+    table: str,
+    filters: Dict[str, Any]
+) -> bool:
+    """
+    Deleta registros de uma tabela do Supabase via REST API.
+    """
+    client = get_supabase_client()
+    if not client:
         return False
 
+    url = f"{client['url']}/rest/v1/{table}"
+    headers = get_headers_with_jwt()
 
-# ===========================================================
-# SELECT
-# ===========================================================
-def supabase_table_select(tabela: str, colunas: str = "*", filtros=None):
+    params = {}
+    if filters:
+        for key, value in filters.items():
+            params[key] = f"eq.{value}"
+
     try:
-        client = get_supabase()
-        query = client.table(tabela).select(colunas)
+        response = requests.delete(url, headers=headers, params=params)
+        response.raise_for_status()
+        return True
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erro ao deletar de {table}: {e}")
+        return False
 
-        if filtros:
-            for k, v in filtros.items():
-                query = query.eq(k, v)
-
-        resp = query.execute()
-
-        return True, resp.data
-
-    except Exception as e:
-        return False, f"Erro no SELECT: {e}"
-
-
-# ===========================================================
-# INSERT
-# ===========================================================
-def supabase_table_insert(tabela: str, dados: dict):
-    try:
-        client = get_supabase()
-        resp = client.table(tabela).insert(dados).execute()
-        return True, resp.data
-    except Exception as e:
-        return False, f"Erro no INSERT: {e}"
-
-
-# ===========================================================
-# UPDATE
-# ===========================================================
-def supabase_table_update(tabela: str, dados_update: dict, filtros: dict):
-    try:
-        client = get_supabase()
-        query = client.table(tabela).update(dados_update)
-
-        for k, v in filtros.items():
-            query = query.eq(k, v)
-
-        resp = query.execute()
-        return True, resp.data
-
-    except Exception as e:
-        return False, f"Erro no UPDATE: {e}"
-
-
-# ===========================================================
-# DELETE
-# ===========================================================
-def supabase_table_delete(tabela: str, filtros: dict):
-    try:
-        client = get_supabase()
-        query = client.table(tabela).delete()
-
-        for k, v in filtros.items():
-            query = query.eq(k, v)
-
-        resp = query.execute()
-
-        deleted = len(resp.data) if resp.data else 0
-        return True, deleted
-
-    except Exception as e:
-        return False, f"Erro no DELETE: {e}"
+def testar_conexao() -> bool:
+    """
+    Testa a conexão com o Supabase.
+    """
+    result = supabase_table_select("usuarios", limit=1)
+    return result is not None
